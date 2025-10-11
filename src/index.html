@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel Listrik Schneider 3D Interaktif</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #222222;
+      }
+      canvas {
+        display: block;
+      }
+      #css-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #powermeter-display {
+        width: 250px;
+        background-color: rgba(210, 210, 210, 0.4);
+        border: 3px solid rgba(10, 10, 10, 0.4);
+        border-radius: 10px;
+        padding: 10px;
+        font-family: "Orbitron", sans-serif;
+        color: #1a1a1a;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        user-select: none;
+        transition: opacity 0.3s ease-in-out;
+        position: relative; /* Diperlukan untuk overlay */
+      }
+      #pm-screen {
+        background-color: rgba(205, 220, 57, 0.95);
+        padding: 15px;
+        border-radius: 5px;
+        border: 2px inset #aaa;
+        text-align: right;
+        height: 70px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        transition: background-color 0.3s; /* Transisi untuk warna error */
+      }
+      /* Style saat dalam kondisi error */
+      #powermeter-display.error-state #pm-screen {
+        background-color: rgba(255, 82, 82, 0.95); /* Merah */
+      }
+      #pm-title {
+        font-size: 14px;
+        text-align: left;
+        margin-bottom: 5px;
+        color: #333;
+        font-weight: 400;
+      }
+      #pm-value-container {
+        display: flex;
+        justify-content: flex-end;
+        align-items: baseline;
+      }
+      #pm-value {
+        font-size: 28px;
+        font-weight: 700;
+      }
+      #pm-unit {
+        font-size: 16px;
+        margin-left: 5px;
+        font-weight: 700;
+      }
+      #pm-nav {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+      }
+      #pm-nav button {
+        background-color: #444;
+        color: white;
+        border: 1px solid #666;
+        border-radius: 5px;
+        padding: 5px 15px;
+        cursor: pointer;
+        font-size: 18px;
+        transition: background-color 0.2s;
+      }
+      #pm-nav button:hover {
+        background-color: #666;
+      }
+      /* Style untuk overlay error */
+      #pm-error-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(211, 47, 47, 0.85);
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        text-align: center;
+        padding: 10px;
+        pointer-events: none; /* Agar tidak mengganggu klik */
+      }
+      #pm-error-overlay svg {
+        width: 80px; /* Ukuran diperbesar sedikit */
+        height: 80px; /* Ukuran diperbesar sedikit */
+        margin-bottom: 10px;
+      }
+      #pm-error-message {
+        font-weight: 700;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Container untuk renderer CSS3D -->
+    <div id="css-container"></div>
+
+    <!-- Kartu Display PM5560 (sekarang akan dikontrol oleh Three.js) -->
+    <div id="powermeter-display" style="display: none">
+      <!-- disembunyikan sementara -->
+      <div id="pm-screen">
+        <div id="pm-title"></div>
+        <div id="pm-value-container">
+          <span id="pm-value"></span>
+          <span id="pm-unit"></span>
+        </div>
+      </div>
+      <div id="pm-nav">
+        <button id="pm-prev">◄</button>
+        <button id="pm-next">►</button>
+      </div>
+      <!-- Overlay untuk pesan error -->
+      <div id="pm-error-overlay" style="display: none">
+        <!-- SVG Ikon Robot Error dengan Dua Mata X --><svg
+          width="80px"
+          height="80px"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <!-- Lingkaran (Muka Robot/Lensa Lup) -->
+          <circle cx="11" cy="11" r="8" stroke="white" stroke-width="1.5" />
+
+          <!-- Mata Kiri X -->
+          <path
+            d="M9 9L7 11"
+            stroke="white"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M7 9L9 11"
+            stroke="white"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+
+          <!-- Mata Kanan X -->
+          <path
+            d="M15 9L13 11"
+            stroke="white"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M13 9L15 11"
+            stroke="white"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+
+          <!-- Pegangan Lup -->
+          <path
+            d="M17.5 17.5L20.5 20.5"
+            stroke="white"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M20.5 20.5L21.5 19.5"
+            stroke="white"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M21.5 19.5L18.5 16.5"
+            stroke="white"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <div id="pm-error-message"></div>
+      </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import {
+        CSS3DRenderer,
+        CSS3DObject,
+      } from "three/addons/renderers/CSS3DRenderer.js";
+
+      // --- Inisialisasi Scene, Kamera, dan Renderer ---
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x222222);
+
+      const camera = new THREE.PerspectiveCamera(
+        60,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(0, 5, 25);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.shadowMap.enabled = true;
+      document.body.appendChild(renderer.domElement);
+
+      const cssRenderer = new CSS3DRenderer();
+      cssRenderer.setSize(window.innerWidth, window.innerHeight);
+      document
+        .getElementById("css-container")
+        .appendChild(cssRenderer.domElement);
+
+      const controls = new OrbitControls(camera, cssRenderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.minDistance = 10;
+      controls.maxDistance = 50;
+      controls.target.set(0, 4, 0);
+      controls.enableZoom = false;
+
+      let targetDistance = camera.position.distanceTo(controls.target);
+
+      function onMouseWheel(event) {
+        isUserInteracting = true;
+        clearTimeout(interactionTimeout);
+        interactionTimeout = setTimeout(() => {
+          isUserInteracting = false;
+        }, 3000);
+        const zoomAmount = event.deltaY * 0.005;
+        targetDistance += zoomAmount * targetDistance;
+        targetDistance = THREE.MathUtils.clamp(
+          targetDistance,
+          controls.minDistance,
+          controls.maxDistance
+        );
+      }
+      window.addEventListener("wheel", onMouseWheel, { passive: false });
+
+      let isUserInteracting = false;
+      let needsReset = false;
+      let targetRotationY = null;
+      let interactionTimeout;
+
+      controls.addEventListener("start", () => {
+        isUserInteracting = true;
+        needsReset = false;
+        targetRotationY = null;
+        clearTimeout(interactionTimeout);
+      });
+
+      controls.addEventListener("end", () => {
+        clearTimeout(interactionTimeout);
+        interactionTimeout = setTimeout(() => {
+          isUserInteracting = false;
+          needsReset = true;
+        }, 3000);
+      });
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+      directionalLight.position.set(15, 20, 10);
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 1024;
+      directionalLight.shadow.mapSize.height = 1024;
+      scene.add(directionalLight);
+
+      const hemisphereLight = new THREE.HemisphereLight(
+        0xffffbb,
+        0x080820,
+        0.5
+      );
+      scene.add(hemisphereLight);
+
+      const floorGeometry = new THREE.PlaneGeometry(100, 100);
+      const floorMaterial = new THREE.ShadowMaterial({ opacity: 0.3 });
+      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -6;
+      floor.receiveShadow = true;
+      scene.add(floor);
+
+      const mat = {
+        panelWhite: new THREE.MeshStandardMaterial({
+          color: 0xe5e5e5,
+          roughness: 0.6,
+        }),
+        panelBlack: new THREE.MeshStandardMaterial({
+          color: 0x222222,
+          roughness: 0.5,
+        }),
+        schneiderGreen: new THREE.MeshStandardMaterial({
+          color: 0x3dcd58,
+          roughness: 0.7,
+        }),
+        switchRed: new THREE.MeshStandardMaterial({
+          color: 0xff4136,
+          roughness: 0.5,
+        }),
+        screen: new THREE.MeshStandardMaterial({
+          color: 0x000000,
+          emissive: 0x1a1a1a,
+          roughness: 0.2,
+        }),
+      };
+
+      const panelGroup = new THREE.Group();
+      scene.add(panelGroup);
+
+      function createBox(width, height, depth, material, position) {
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        const box = new THREE.Mesh(geometry, material);
+        box.position.set(position.x, position.y, position.z);
+        box.castShadow = true;
+        box.receiveShadow = true;
+        return box;
+      }
+
+      const panelDepth = 4;
+      const panelWidth = 7.2;
+
+      const totalTopWidth = panelWidth * 2;
+      const leftTopWidth = totalTopWidth / 3 + 2;
+      const rightTopWidth = (totalTopWidth * 2) / 3 - 2;
+
+      const topLeftPanel = createBox(
+        leftTopWidth,
+        3,
+        panelDepth,
+        mat.panelWhite,
+        { x: -totalTopWidth / 2 + leftTopWidth / 2, y: 7.0, z: 0 }
+      );
+      const topRightPanel = createBox(
+        rightTopWidth,
+        7,
+        panelDepth,
+        mat.panelWhite,
+        { x: totalTopWidth / 2 - rightTopWidth / 2, y: 9.0, z: 0 }
+      );
+      panelGroup.add(topLeftPanel, topRightPanel);
+
+      const middleHeight = 4.5;
+      const bottomHeight = 5.5;
+
+      const middleY = 3.25;
+      const bottomY = -1.75;
+
+      const middleLeftBlack = createBox(
+        panelWidth - 0.2,
+        middleHeight,
+        panelDepth - 0.5,
+        mat.panelBlack,
+        { x: -panelWidth / 2, y: middleY, z: 0.25 }
+      );
+      const middleRightBlack = createBox(
+        panelWidth - 0.2,
+        middleHeight,
+        panelDepth - 0.5,
+        mat.panelBlack,
+        { x: panelWidth / 2, y: middleY, z: 0.25 }
+      );
+      panelGroup.add(middleLeftBlack, middleRightBlack);
+
+      const bottomLeft = createBox(
+        panelWidth,
+        bottomHeight,
+        panelDepth,
+        mat.panelWhite,
+        { x: -panelWidth / 2, y: bottomY, z: 0 }
+      );
+      const bottomRight = createBox(
+        panelWidth,
+        bottomHeight,
+        panelDepth,
+        mat.panelWhite,
+        { x: panelWidth / 2, y: bottomY, z: 0 }
+      );
+      panelGroup.add(bottomLeft, bottomRight);
+
+      const bottomMiddleRecess = createBox(
+        4,
+        5,
+        panelDepth - 1,
+        mat.panelWhite,
+        { x: 0, y: -2.0, z: 1.75 }
+      );
+      panelGroup.add(bottomMiddleRecess);
+
+      const meter1 = createBox(1.0, 1.0, 0.2, mat.screen, {
+        x: 3.0,
+        y: 10.0,
+        z: panelDepth / 2 + 0.1,
+      });
+      const meter2 = createBox(2.5, 2.0, 0.2, mat.screen, {
+        x: 5.5,
+        y: 10.0,
+        z: panelDepth / 2 + 0.1,
+      });
+      panelGroup.add(meter1, meter2);
+
+      const greenLabelTopLeft = createBox(
+        panelWidth - 0.2,
+        0.4,
+        0.1,
+        mat.schneiderGreen,
+        { x: -panelWidth / 2, y: 5.7, z: panelDepth / 2 - 0.1 }
+      );
+      const greenLabelBotLeft = createBox(3, 0.2, 0.1, mat.schneiderGreen, {
+        x: -5.5,
+        y: 1.2,
+        z: panelDepth / 2 + 0.1,
+      });
+      const greenLabelBotRight = createBox(3, 0.2, 0.1, mat.schneiderGreen, {
+        x: 5.5,
+        y: 1.2,
+        z: panelDepth / 2 + 0.1,
+      });
+      panelGroup.add(greenLabelBotLeft, greenLabelBotRight);
+
+      const whiteLabel = createBox(4, 0.8, 0.1, mat.panelWhite, {
+        x: panelWidth / 2,
+        y: 5.7,
+        z: panelDepth / 2 - 0.1,
+      });
+      panelGroup.add(whiteLabel);
+
+      const slot1 = createBox(1, 1.5, 0.1, mat.panelBlack, {
+        x: -5.5,
+        y: -0.5,
+        z: panelDepth / 2 + 0.1,
+      });
+      const slot2 = createBox(1, 1.5, 0.1, mat.panelBlack, {
+        x: -5.5,
+        y: -3,
+        z: panelDepth / 2 + 0.1,
+      });
+      const slot3 = createBox(1, 1.5, 0.1, mat.panelBlack, {
+        x: 5.5,
+        y: 0,
+        z: panelDepth / 2 + 0.1,
+      });
+      const slot4 = createBox(1, 1.5, 0.1, mat.panelBlack, {
+        x: 5.5,
+        y: -2.5,
+        z: panelDepth / 2 + 0.1,
+      });
+      panelGroup.add(slot1, slot2, slot3, slot4);
+
+      const mainBreaker = createBox(2, 4, 1.5, mat.panelBlack, {
+        x: 0,
+        y: -2.0,
+        z: 2.75,
+      });
+      const breakerSwitch = createBox(0.5, 2.5, 0.3, mat.switchRed, {
+        x: 0,
+        y: 0.3,
+        z: 1.5 / 2 + 0.3 / 2,
+      });
+      mainBreaker.add(breakerSwitch);
+      panelGroup.add(mainBreaker);
+
+      panelGroup.position.y = -1;
+
+      const pmDisplayElement = document.getElementById("powermeter-display");
+      pmDisplayElement.style.display = "block";
+
+      const pmDisplayObject = new CSS3DObject(pmDisplayElement);
+      pmDisplayObject.position.set(0, 4.5, 6);
+      const scale = 0.05;
+      pmDisplayObject.scale.set(scale, scale, scale);
+      panelGroup.add(pmDisplayObject);
+
+      const pmTitleEl = document.getElementById("pm-title");
+      const pmValueEl = document.getElementById("pm-value");
+      const pmUnitEl = document.getElementById("pm-unit");
+      const pmPrevBtn = document.getElementById("pm-prev");
+      const pmNextBtn = document.getElementById("pm-next");
+      const errorOverlay = document.getElementById("pm-error-overlay");
+      const errorMessage = document.getElementById("pm-error-message");
+
+      const pmData = [
+        {
+          title: "Average Voltage",
+          unit: "V",
+          base: 220,
+          variation: 3,
+          min: 215,
+          max: 225,
+        },
+        {
+          title: "Average Current",
+          unit: "A",
+          base: 15,
+          variation: 2.5,
+          min: 10,
+          max: 20,
+        },
+        {
+          title: "Total Power",
+          unit: "kW",
+          base: 3.8,
+          variation: 2,
+          min: 2.0,
+          max: 4.5,
+        },
+        {
+          title: "Energy Consumed",
+          unit: "kWh",
+          base: 1250,
+          variation: 0.01,
+          min: 0,
+          max: 2000,
+        },
+        {
+          title: "Phase 1 Voltage",
+          unit: "V",
+          base: 221,
+          variation: 1,
+          min: 215,
+          max: 225,
+        },
+        {
+          title: "Phase 2 Voltage",
+          unit: "V",
+          base: 219,
+          variation: 1,
+          min: 215,
+          max: 225,
+        },
+        {
+          title: "Phase 3 Voltage",
+          unit: "V",
+          base: 220,
+          variation: 1,
+          min: 215,
+          max: 225,
+        },
+      ];
+
+      let currentScreenIndex = 0;
+      let isAnomalyActive = false;
+      let anomalousDataTitle = null;
+      const lastGeneratedValues = pmData.map(() => ({
+        value: "0.0",
+        isAnomalous: false,
+      }));
+
+      function generateValue(data) {
+        const value = data.base + (Math.random() - 0.5) * data.variation;
+        const isAnomalous = value < data.min || value > data.max;
+        const decimals = data.base < 100 ? 2 : 1;
+        return {
+          value: value.toFixed(decimals),
+          isAnomalous: isAnomalous,
+        };
+      }
+
+      function updateDataAndCheckAnomalies() {
+        pmData.forEach((data, index) => {
+          lastGeneratedValues[index] = generateValue(data);
+        });
+
+        const activeAnomaly = lastGeneratedValues.find(
+          (res, index) => res.isAnomalous
+        );
+
+        if (activeAnomaly) {
+          isAnomalyActive = true;
+          const anomalyIndex = lastGeneratedValues.indexOf(activeAnomaly);
+          anomalousDataTitle = pmData[anomalyIndex].title;
+        } else {
+          isAnomalyActive = false;
+          anomalousDataTitle = null;
+        }
+
+        renderDisplay();
+      }
+
+      function renderDisplay() {
+        const currentData = pmData[currentScreenIndex];
+        const currentResult = lastGeneratedValues[currentScreenIndex];
+
+        pmTitleEl.textContent = currentData.title;
+        pmValueEl.textContent = currentResult.value;
+        pmUnitEl.textContent = currentData.unit;
+
+        if (isAnomalyActive) {
+          pmDisplayElement.classList.add("error-state");
+          errorOverlay.style.display = "flex";
+          errorMessage.textContent = `ANOMALY: ${anomalousDataTitle}`;
+        } else {
+          pmDisplayElement.classList.remove("error-state");
+          errorOverlay.style.display = "none";
+        }
+      }
+
+      pmPrevBtn.addEventListener("mousedown", (event) => {
+        event.stopPropagation();
+        currentScreenIndex--;
+        if (currentScreenIndex < 0) {
+          currentScreenIndex = pmData.length - 1;
+        }
+        renderDisplay();
+      });
+      pmNextBtn.addEventListener("mousedown", (event) => {
+        event.stopPropagation();
+        currentScreenIndex++;
+        if (currentScreenIndex >= pmData.length) {
+          currentScreenIndex = 0;
+        }
+        renderDisplay();
+      });
+
+      setInterval(updateDataAndCheckAnomalies, 2000);
+      updateDataAndCheckAnomalies();
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        cssRenderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // DIUBAH: Menggunakan logika dari referensi Anda
+      const panelDirection = new THREE.Vector3();
+      const cameraDirection = new THREE.Vector3();
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const currentDistance = camera.position.distanceTo(controls.target);
+        const smoothedDistance = THREE.MathUtils.lerp(
+          currentDistance,
+          targetDistance,
+          0.08
+        );
+        const direction = new THREE.Vector3()
+          .subVectors(camera.position, controls.target)
+          .normalize();
+        camera.position
+          .copy(controls.target)
+          .addScaledVector(direction, smoothedDistance);
+
+        if (needsReset) {
+          if (targetRotationY === null) {
+            targetRotationY =
+              Math.round(panelGroup.rotation.y / (Math.PI * 2)) * (Math.PI * 2);
+          }
+          panelGroup.rotation.y = THREE.MathUtils.lerp(
+            panelGroup.rotation.y,
+            targetRotationY,
+            0.05
+          );
+
+          if (Math.abs(panelGroup.rotation.y - targetRotationY) < 0.01) {
+            panelGroup.rotation.y = targetRotationY;
+            needsReset = false;
+            targetRotationY = null;
+          }
+        } else if (!isUserInteracting) {
+          panelGroup.rotation.y += 0.003;
+        }
+
+        // DIUBAH: Logika visibilitas dari kode referensi Anda
+        panelDirection.set(0, 0, 1).applyQuaternion(panelGroup.quaternion);
+        cameraDirection
+          .subVectors(camera.position, panelGroup.position)
+          .normalize();
+        const dotProduct = panelDirection.dot(cameraDirection);
+
+        if (dotProduct > 0.1) {
+          pmDisplayElement.style.opacity = "1";
+          pmDisplayElement.style.pointerEvents = "auto";
+        } else {
+          pmDisplayElement.style.opacity = "0";
+          pmDisplayElement.style.pointerEvents = "none";
+        }
+
+        controls.update();
+        renderer.render(scene, camera);
+        cssRenderer.render(scene, camera);
+      }
+
+      animate();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,156 @@
+/* ... (semua style lama Anda tetap sama) ... */
+body {
+  margin: 0;
+  overflow: hidden;
+  background-color: #222222;
+  font-family: sans-serif;
+}
+
+.scene-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* === PERUBAHAN DI SINI === */
+.scene-container > div {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Lapisan WebGL (belakang) */
+.webgl-container {
+  z-index: 0;
+}
+
+/* Lapisan CSS (depan) */
+#css-container {
+  /* Membuat lapisan ini tidak bisa diklik secara default */
+  pointer-events: none;
+  z-index: 1;
+}
+
+canvas {
+  display: block;
+}
+
+#powermeter-display {
+  width: 250px;
+  background-color: rgba(210, 210, 10, 0.4);
+  border: 3px solid rgba(10, 10, 10, 0.4);
+  border-radius: 10px;
+  padding: 10px;
+  font-family: "Orbitron", sans-serif;
+  color: #1a1a1a;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  user-select: none;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+  position: relative;
+  opacity: 0;
+  transform: scale(0.95);
+  /* Mengaktifkan kembali event untuk elemen ini saja */
+  pointer-events: auto;
+}
+
+#powermeter-display.visible {
+  opacity: 1;
+  transform: scale(1);
+}
+/* ... (sisa style CSS Anda tetap sama) ... */
+
+#pm-screen {
+  background-color: rgba(205, 220, 57, 0.95);
+  padding: 15px;
+  border-radius: 5px;
+  border: 2px inset #aaa;
+  text-align: right;
+  height: 70px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: background-color 0.3s;
+}
+
+#powermeter-display.error-state #pm-screen {
+  background-color: rgba(255, 82, 82, 0.95);
+}
+
+#pm-title {
+  font-size: 14px;
+  text-align: left;
+  margin-bottom: 5px;
+  color: #333;
+  font-weight: 400;
+}
+
+#pm-value-container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+}
+
+#pm-value {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+#pm-unit {
+  font-size: 16px;
+  margin-left: 5px;
+  font-weight: 700;
+}
+
+#pm-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+#pm-nav button {
+  background-color: #444;
+  color: white;
+  border: 1px solid #666;
+  border-radius: 5px;
+  padding: 5px 15px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: background-color 0.2s;
+}
+
+#pm-nav button:hover {
+  background-color: #666;
+}
+
+#pm-error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(211, 47, 47, 0.85);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-align: center;
+  padding: 10px;
+  pointer-events: none;
+}
+
+#pm-error-overlay svg {
+  width: 80px;
+  height: 80px;
+  margin-bottom: 10px;
+}
+
+#pm-error-message {
+  font-weight: 700;
+  font-size: 16px;
+}
