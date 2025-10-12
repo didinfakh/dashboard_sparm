@@ -1,11 +1,14 @@
 // SchneiderPanel.jsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {
   CSS3DRenderer,
   CSS3DObject,
 } from "three/examples/jsm/renderers/CSS3DRenderer.js";
+import { db, db2, dbDatabase } from "../Firebase";
+import { onValue, ref } from "firebase/database";
+import { collection, getDocs } from "firebase/firestore";
 
 /**
  * SchneiderPanel
@@ -19,8 +22,41 @@ import {
  * </div>
  */
 export default function SchneiderPanel() {
+  const screenCanvasRef = useRef(null);
+  const screenTextureRef = useRef(null);
+
   const hostRef = useRef(null);
   const rafRef = useRef(null);
+  const [panelData, setPanelData] = useState({});
+
+  async function getDatabase() {
+    const snapshot = await getDocs(
+      collection(dbDatabase, "monthly_forecast_summary")
+    );
+    console.log(snapshot.docs.map((doc) => doc.data()));
+  }
+  useEffect(() => {
+    console.log("Fetching data from Firebase...");
+    getDatabase();
+    const panelRef = ref(db2, "sensor_data");
+
+    const unsubscribe = onValue(
+      panelRef,
+      (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          console.log("ini adalah console.log data dari firebase");
+          console.log(data);
+          setPanelData(data);
+        }
+      },
+      (error) => {
+        console.error("Error membaca data:", error);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     // add Orbitron font link (optional, untuk style mirip device)
@@ -324,17 +360,24 @@ export default function SchneiderPanel() {
     panelGroup.add(meter1, meter2);
 
     // Create a screen plane with a dynamic canvas texture (to show numbers similar to PM)
+    // const screenCanvas = document.createElement("canvas");
+    // screenCanvas.width = 800;
+    // screenCanvas.height = 360;
+    // const sctx = screenCanvas.getContext("2d");
+
     const screenCanvas = document.createElement("canvas");
     screenCanvas.width = 800;
     screenCanvas.height = 360;
     const sctx = screenCanvas.getContext("2d");
+    screenCanvasRef.current = screenCanvas; // 🔹 simpan referensi
 
     function drawScreenText(
-      valueStr = "221.3",
+      valueStr = "221.4",
       title = "Average Voltage",
       unit = "V"
     ) {
       // background
+
       sctx.fillStyle = "#d9ea19"; // yellow-green
       sctx.fillRect(0, 0, screenCanvas.width, screenCanvas.height);
 
@@ -359,9 +402,10 @@ export default function SchneiderPanel() {
     }
 
     // initial draw
-    drawScreenText("221.3", "Average Voltage", "V");
+    // drawScreenText("221.3", "Average Voltage", "V");
 
     const screenTexture = new THREE.CanvasTexture(screenCanvas);
+    screenTextureRef.current = screenTexture;
     screenTexture.minFilter = THREE.LinearFilter;
     screenTexture.needsUpdate = true;
 
@@ -436,7 +480,7 @@ export default function SchneiderPanel() {
         <div id="pm-screen" style="background:rgba(205,220,57,0.98);padding:14px;border-radius:6px;border:2px inset #aaa;text-align:right;height:86px;display:flex;flex-direction:column;justify-content:center;transition:background-color 0.2s;">
           <div id="pm-title" style="font-size:14px;text-align:left;margin-bottom:6px;color:#333">Average Voltage</div>
           <div id="pm-value-container" style="display:flex;justify-content:flex-end;align-items:baseline">
-            <span id="pm-value" style="font-size:36px;font-weight:700">221.3</span>
+            <span id="pm-value" style="font-size:36px;font-weight:700"></span>
             <span id="pm-unit" style="font-size:16px;margin-left:8px;font-weight:700">V</span>
           </div>
         </div>
@@ -566,6 +610,8 @@ export default function SchneiderPanel() {
 
     function renderPM() {
       const d = pmData[currentIndex];
+      console.log("ini adalah panel");
+      console.log(panelData);
       const r = lastVals[currentIndex];
       pmTitle.textContent = d.title;
       pmValue.textContent = r.valStr;
@@ -573,15 +619,15 @@ export default function SchneiderPanel() {
 
       // update canvas screen if showing a voltage/phase/current
       // For readability, if numeric is very large (kWh), show condensed
-      if (d.unit === "kWh") {
-        drawScreenText(r.valStr, d.title, d.unit);
-      } else {
-        drawScreenText(
-          r.valStr + (d.unit && d.unit !== "" ? "" : ""),
-          d.title,
-          d.unit
-        );
-      }
+      // if (d.unit === "kWh") {
+      //   drawScreenText(r.valStr, d.title, d.unit);
+      // } else {
+      //   drawScreenText(
+      //     r.valStr + (d.unit && d.unit !== "" ? "" : ""),
+      //     d.title,
+      //     d.unit
+      //   );
+      // }
       screenTexture.needsUpdate = true;
 
       if (anomalyActive) {
@@ -608,8 +654,8 @@ export default function SchneiderPanel() {
     });
 
     // initial generation + periodic update
-    updatePMValues();
-    const pmInterval = setInterval(updatePMValues, 2000);
+    // updatePMValues();
+    // const pmInterval = setInterval(updatePMValues, 2000);
 
     // camera distance smoothing via wheel
     let targetDistance = camera.position.distanceTo(controls.target);
@@ -722,7 +768,7 @@ export default function SchneiderPanel() {
     return () => {
       ro.disconnect();
       host.removeEventListener("wheel", onWheel);
-      clearInterval(pmInterval);
+      // clearInterval(pmInterval);
       cancelAnimationFrame(rafRef.current);
 
       // remove appended DOM
@@ -748,6 +794,51 @@ export default function SchneiderPanel() {
     };
   }, []);
 
+  // Tambahkan efek baru di bawah Firebase useEffect
+  // useEffect(() => {
+  //   console.log("Firebase berubah:", panelData);
+
+  //   if (!panelData || Object.keys(panelData).length === 0) return;
+
+  //   const value = panelData.Ptot ?? "0";
+  //   const title = "Total Power";
+  //   const unit = "kW";
+
+  //   const screenCanvas = Array.from(document.querySelectorAll("canvas")).find(
+  //     (c) => c.width === 800 && c.height === 360
+  //   );
+  //   if (!screenCanvas) return;
+
+  //   const ctx = screenCanvas.getContext("2d");
+  //   ctx.fillStyle = "#d9ea19";
+  //   ctx.fillRect(0, 0, screenCanvas.width, screenCanvas.height);
+
+  //   ctx.fillStyle = "#111";
+  //   ctx.font = "36px Orbitron, sans-serif";
+  //   ctx.textAlign = "left";
+  //   ctx.fillText(title, 30, 70);
+
+  //   ctx.font = "bold 120px Orbitron, sans-serif";
+  //   ctx.textAlign = "right";
+  //   ctx.fillText(String(value), screenCanvas.width - 50, 220);
+
+  //   ctx.font = "36px Orbitron, sans-serif";
+  //   ctx.fillText(unit, screenCanvas.width - 30, 280);
+
+  //   if (screenCanvas.texture) screenCanvas.texture.needsUpdate = true;
+  // }, [panelData]);
+
+  useEffect(() => {
+    if (!panelData || Object.keys(panelData).length === 0) return;
+    if (!screenCanvasRef.current || !screenTextureRef.current) return;
+
+    const value = panelData.Ptot ?? "0";
+    const title = "Total Power";
+    const unit = "kW";
+
+    document.getElementById("pm-value").textContent = String(value);
+  }, [panelData]);
+
   // host container: w-full, height can be controlled by parent. default minHeight
   return (
     <div
@@ -755,7 +846,7 @@ export default function SchneiderPanel() {
       style={{
         position: "relative",
         width: "100%",
-        height: "600px",
+        height: "300px",
         minHeight: "360px",
         overflow: "hidden",
         borderRadius: "12px",

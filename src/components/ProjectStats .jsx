@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { FiArrowUpRight } from "react-icons/fi";
 import { BsCalendarWeek } from "react-icons/bs"; // Ikon kalender
 import { IoChatbubblesOutline } from "react-icons/io5"; // Ikon untuk "On Discuss"
-import { db } from "../Firebase";
+import { db, db2 } from "../Firebase";
 import { ref, onValue } from "firebase/database";
 /**
  * Sub-komponen untuk satu kartu statistik.
@@ -105,7 +105,7 @@ export const ProjectStats = () => {
   const [panelData, setPanelData] = useState({});
   useEffect(() => {
     console.log("Fetching data from Firebase...");
-    const panelRef = ref(db, "panel_2");
+    const panelRef = ref(db2, "sensor_data");
 
     const unsubscribe = onValue(
       panelRef,
@@ -174,8 +174,6 @@ export const ProjectStats = () => {
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {console.log("==== ini data panel data")}
-        {console.log(panelData.Iavg)}
         {statsData.map((stat, index) => (
           <StatCard
             key={index}
