@@ -8,7 +8,7 @@ import {
 } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { db, db2, dbDatabase } from "../Firebase";
 import { onValue, ref } from "firebase/database";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 
 /**
  * SchneiderPanel
@@ -28,12 +28,27 @@ export default function SchneiderPanel() {
   const hostRef = useRef(null);
   const rafRef = useRef(null);
   const [panelData, setPanelData] = useState({});
+  const [monthSumarry, setMonthSumarry] = useState([]);
 
   async function getDatabase() {
-    const snapshot = await getDocs(
-      collection(dbDatabase, "monthly_forecast_summary")
-    );
-    console.log(snapshot.docs.map((doc) => doc.data()));
+    // const snapshot = await getDocs(
+    //   collection(dbDatabase, "monthly_forecast_summary")
+    // );
+    // console.log(snapshot.docs.map((doc) => doc.data()));
+    try {
+      const q = query(
+        collection(dbDatabase, "monthly_forecast_summary"),
+        orderBy("created_at", "desc"),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
+      console.log(snapshot);
+      const data = snapshot.docs.map((doc) => doc.data());
+      console.log("Data terakhir:", data);
+      setMonthSumarry(data);
+    } catch (error) {
+      console.error("Gagal ambil data Firestore:", error);
+    }
   }
   useEffect(() => {
     console.log("Fetching data from Firebase...");
