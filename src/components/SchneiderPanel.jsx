@@ -30,29 +30,9 @@ export default function SchneiderPanel() {
   const [panelData, setPanelData] = useState({});
   const [monthSumarry, setMonthSumarry] = useState([]);
 
-  async function getDatabase() {
-    // const snapshot = await getDocs(
-    //   collection(dbDatabase, "monthly_forecast_summary")
-    // );
-    // console.log(snapshot.docs.map((doc) => doc.data()));
-    try {
-      const q = query(
-        collection(dbDatabase, "monthly_forecast_summary"),
-        orderBy("created_at", "desc"),
-        limit(1)
-      );
-      const snapshot = await getDocs(q);
-      console.log(snapshot);
-      const data = snapshot.docs.map((doc) => doc.data());
-      console.log("Data terakhir:", data);
-      setMonthSumarry(data);
-    } catch (error) {
-      console.error("Gagal ambil data Firestore:", error);
-    }
-  }
   useEffect(() => {
     console.log("Fetching data from Firebase...");
-    getDatabase();
+    // getDatabase();
     const panelRef = ref(db2, "sensor_data");
 
     const unsubscribe = onValue(
@@ -493,10 +473,10 @@ export default function SchneiderPanel() {
     pmEl.innerHTML = `
       <div id="pm-root" style="width:100%;background:rgba(210,210,210,0.88);border:3px solid rgba(10,10,10,0.38);border-radius:10px;padding:10px;box-sizing:border-box;">
         <div id="pm-screen" style="background:rgba(205,220,57,0.98);padding:14px;border-radius:6px;border:2px inset #aaa;text-align:right;height:86px;display:flex;flex-direction:column;justify-content:center;transition:background-color 0.2s;">
-          <div id="pm-title" style="font-size:14px;text-align:left;margin-bottom:6px;color:#333">Average Voltage</div>
+          <div id="pm-title" style="font-size:14px;text-align:left;margin-bottom:6px;color:#333">Total Power</div>
           <div id="pm-value-container" style="display:flex;justify-content:flex-end;align-items:baseline">
             <span id="pm-value" style="font-size:36px;font-weight:700"></span>
-            <span id="pm-unit" style="font-size:16px;margin-left:8px;font-weight:700">V</span>
+            <span id="pm-unit" style="font-size:16px;margin-left:8px;font-weight:700">W</span>
           </div>
         </div>
         <div id="pm-nav" style="display:flex;justify-content:space-between;margin-top:10px">

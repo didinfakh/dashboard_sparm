@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   FiSearch,
   FiBell,
@@ -47,6 +47,9 @@ ChartJS.register(
   LineElement,
   Title
 );
+import { db, db2, dbDatabase } from "./Firebase";
+import { onValue, ref } from "firebase/database";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 
 // Data dummy untuk grafik detak jantung
 const heartRateData = [
@@ -71,6 +74,33 @@ const cholesterolData = [
 ];
 
 const Dashboard2 = () => {
+  const [monthSumarry, setMonthSumarry] = useState([]);
+  const [dataMonthSummary, setDataMonthSummary] = useState([]);
+  async function getDatabase() {
+    const snapshot = await getDocs(
+      collection(dbDatabase, "monthly_forecast_summary")
+    );
+    console.log("isi snapshot");
+    console.log(snapshot.docs.map((doc) => doc.data()));
+    setDataMonthSummary(snapshot.docs.map((doc) => doc.data()));
+    try {
+      const q = query(
+        collection(dbDatabase, "monthly_forecast_summary"),
+        orderBy("created_at", "desc"),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
+      console.log(snapshot);
+      const data = snapshot.docs.map((doc) => doc.data());
+      console.log("Data terakhir:", data);
+      setMonthSumarry(data[0]);
+    } catch (error) {
+      console.error("Gagal ambil data Firestore:", error);
+    }
+  }
+  useEffect(() => {
+    getDatabase();
+  }, []);
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
       <div className="bg-gray-100  shadow-lg p-6">
@@ -102,87 +132,36 @@ const Dashboard2 = () => {
             </div>
           </div>
         </main>
-        <div className=" mt-3 md:col-span-2  text-white flex justify-between items-end">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* Kolom 1-3: Tabel Order (Menggunakan gaya semantik <table>) */}
-            <div className="lg:col-span-4 bg-white p-6 rounded-lg shadow-xl">
+        <div className="mt-3  text-white flex justify-between items-end">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 w-full">
+            {/* ====== BAGIAN TABEL ====== */}
+            <div className="col-span-1 lg:col-span-4 bg-white p-6 rounded-lg shadow-xl w-full">
               <h2 className="text-xl font-semibold mb-4 text-black">
-                Laporan Status Order
+                Record Prediction
               </h2>
-              <table className="min-w-full divide-y divide-black">
+              <table className="w-full divide-y divide-black">
                 <thead className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <tr>
-                    <th scope="col" className="py-3 text-left">
-                      ORDER NUMBER
-                    </th>
-                    <th scope="col" className="py-3 text-left">
-                      TYPE
-                    </th>
-                    <th scope="col" className="py-3 text-left">
-                      DATE
-                    </th>
-                    <th scope="col" className="py-3 text-left">
-                      REPORTED BY
-                    </th>
-                    <th scope="col" className="py-3 text-right">
-                      STATUS
-                    </th>
+                    <th className="py-3 text-left">NUMBER</th>
+                    <th className="py-3 text-left">DATE</th>
+                    <th className="py-3 text-left">COST</th>
+                    <th className="py-3 text-left">KWH</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-500 text-sm">
-                  {[
-                    {
-                      id: "#200211",
-                      type: "Traffic",
-                      date: "13 Nov, 2022",
-                      reporter: "Nova Post",
-                      logoColor: "bg-red-400",
-                      status: "Reported",
-                      statusClass: "bg-purple-500 text-purple-100",
-                    },
-                    {
-                      id: "#200212",
-                      type: "Planning mistake",
-                      date: "16 Nov, 2022",
-                      reporter: "DHL",
-                      logoColor: "bg-yellow-400",
-                      status: "In review",
-                      statusClass: "bg-green-500 text-green-100",
-                    },
-                    {
-                      id: "#765947",
-                      type: "Delay",
-                      date: "24 Nov, 2022",
-                      reporter: "UPS",
-                      logoColor: "bg-orange-500",
-                      status: "Reported",
-                      statusClass: "bg-purple-500 text-purple-100",
-                    },
-                  ].map((order) => (
-                    <tr key={order.id} className="text-black hover:bg-white">
+                  {dataMonthSummary.map((value, index) => (
+                    <tr key={index} className="text-black hover:bg-gray-50">
                       <td className="py-4 whitespace-nowrap font-medium text-gray-800">
-                        {order.id}
+                        {index + 1}
                       </td>
                       <td className="py-4 whitespace-nowrap text-gray-500">
-                        {order.type}
+                        {value.forecast_month}
                       </td>
                       <td className="py-4 whitespace-nowrap text-gray-500">
-                        {order.date}
+                        Rp. {value.predicted_total_cost.toLocaleString("id-ID")}
                       </td>
-                      <td className="py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span
-                            className={`w-3 h-3 rounded-full mr-3 ${order.logoColor}`}
-                          ></span>
-                          <span>{order.reporter}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 whitespace-nowrap text-right">
-                        <span
-                          className={`text-xs px-3 py-1 rounded-full font-medium ${order.statusClass}`}
-                        >
-                          {order.status}
-                        </span>
+                      <td className="py-4 whitespace-nowrap text-gray-500">
+                        {Math.round(value.predicted_total_kwh * 100) / 100}{" "}
                       </td>
                     </tr>
                   ))}
@@ -190,54 +169,24 @@ const Dashboard2 = () => {
               </table>
             </div>
 
-            <div className="lg:col-span-1 flex flex-col gap-6">
-              <div
-                className={`p-4 rounded-lg shadow-xl h-40 flex flex-col justify-between bg-[#ffd53f]`}
-              >
+            {/* ====== BAGIAN STATISTIK ====== */}
+            <div className="col-span-1 flex flex-col gap-6">
+              {/* Card INVOICE */}
+              <div className="p-4 rounded-lg shadow-xl h-40 flex flex-col justify-between bg-[#ffd53f] text-black">
                 <div className="flex justify-between items-start">
-                  <div className="text-sm font-medium opacity-80 text-black">
-                    INVOICE
-                  </div>
-                  <div className="w-20 h-10">
-                    {/* Chart mini untuk Invoice */}
-                    <Line
-                      data={{
-                        labels: ["J", "F", "M", "A", "M", "J"],
-                        datasets: [
-                          {
-                            data: [10, 25, 15, 30, 20, 35],
-                            borderColor: "black",
-                            borderWidth: 2,
-                            pointRadius: 0,
-                            tension: 0.4,
-                            fill: false,
-                          },
-                        ],
-                      }}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false },
-                          tooltip: { enabled: false },
-                        },
-                        scales: {
-                          x: { display: false },
-                          y: { display: false },
-                        },
-                        elements: { point: { radius: 0 } },
-                      }}
-                    />
+                  <div className="text-sm font-medium opacity-80">
+                    Prediction Price per Month
                   </div>
                 </div>
-                <div className="flex justify-between items-end">
+                <div className="flex justify-around items-end">
                   <div>
-                    <div className="text-3xl font-bold text-black">€4,598</div>
-                    <div className="text-xs text-black opacity-70">
-                      UPCOMING INVOICE
-                    </div>
+                    <div className="text-xl font-bold">{`Rp. ${(
+                      monthSumarry.predicted_total_kwh *
+                      monthSumarry.price_per_kwh
+                    ).toLocaleString("id-ID")}`}</div>
+                    <div className="text-xs opacity-70">UPCOMING INVOICE</div>
                   </div>
-                  <div className="flex items-center text-xs font-semibold text-black">
+                  <div className="flex items-center text-xs font-semibold">
                     <svg
                       className="w-3 h-3 mr-1"
                       fill="none"
@@ -257,46 +206,19 @@ const Dashboard2 = () => {
                 </div>
               </div>
 
-              {/* Stat Card 2: PALLET DELIVERIES (Background Gelap) */}
+              {/* Card PALLET DELIVERIES */}
+              {console.log("ini adalah mont sumary")}
+              {console.log(monthSumarry)}
               <div className="bg-white p-4 rounded-lg shadow-xl h-40 flex flex-col justify-between text-black">
                 <div className="flex justify-between items-start">
                   <div className="text-sm font-medium opacity-80">
-                    PALLET DELIVERIES
-                  </div>
-                  <div className="w-20 h-10 opacity-70">
-                    {/* Chart mini untuk Pallet */}
-                    <Line
-                      data={{
-                        labels: ["J", "F", "M", "A", "M", "J"],
-                        datasets: [
-                          {
-                            data: [35, 20, 30, 15, 25, 10],
-                            borderColor: "white",
-                            borderWidth: 2,
-                            pointRadius: 0,
-                            tension: 0.4,
-                            fill: false,
-                          },
-                        ],
-                      }}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false },
-                          tooltip: { enabled: false },
-                        },
-                        scales: {
-                          x: { display: false },
-                          y: { display: false },
-                        },
-                        elements: { point: { radius: 0 } },
-                      }}
-                    />
+                    Prediction Kwh per Month
                   </div>
                 </div>
                 <div className="flex justify-between items-end">
-                  <div className="text-3xl font-bold">1650</div>
+                  <div className="text-2xl font-bold">{`${
+                    Math.round(monthSumarry.predicted_total_kwh * 100) / 100
+                  } Kwh`}</div>
                   <div className="flex items-center text-xs font-semibold text-green-700">
                     <svg
                       className="w-3 h-3 mr-1"
