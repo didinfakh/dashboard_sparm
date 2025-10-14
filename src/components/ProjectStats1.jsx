@@ -53,8 +53,8 @@ const StatCard = ({
           ["V1", "V2", "V3", "Vavg"].includes(id)
             ? (panelData[id] / 100).toFixed(1)
             : id == "Edel"
-            ? (panelData[id] / 1000).toFixed(2)
-            : panelData[id]
+            ? (panelData && panelData[id] / 1000)?.toFixed(2)
+            : panelData && panelData[id]
         } ${satuan}`}</p>
       </div>
       <div className={`flex items-center gap-2 mt-4 ${descriptionTextClasses}`}>
@@ -170,7 +170,7 @@ export const ProjectStats1 = () => {
         />
         <StatCardLong
           title="Frekuensi"
-          value={`${panelData.frekuensi.toFixed(1) || 0} Hz`}
+          value={`${panelData.frekuensi?.toFixed(1) || 0} Hz`}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
