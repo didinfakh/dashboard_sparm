@@ -112,7 +112,7 @@ export const ProjectStats = () => {
 
   const limits = {
     Vavg: { min: 11000, max: 22000 },
-    Iavg: { min: 2000, max: 10 },
+    Iavg: { min: 0, max: 10 },
     Ptot: { min: 0, max: 1000 },
     Edel: { min: 0, max: Infinity }, // energi terpakai tidak dibatasi
     V1: { min: 19000, max: 22000 },
