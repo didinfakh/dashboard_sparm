@@ -149,15 +149,14 @@ function KwhForecastChart() {
 
   return (
     <div className="page-container">
-      <VisualizationCard title="Prediksi Penggunaan kWh per Jam">
-        <div className="line-chart-wrapper">
-          {loading || !chartData ? (
-            <p className="loading-text">Memuat data historis & prediksi...</p>
-          ) : (
-            <Line options={options} data={chartData} />
-          )}
-        </div>
-      </VisualizationCard>
+      test
+      <div className="line-chart-wrapper">
+        {loading || !chartData ? (
+          <p className="loading-text">Memuat data historis & prediksi...</p>
+        ) : (
+          <Line options={options} data={chartData} />
+        )}
+      </div>
     </div>
   );
 }
