@@ -51,6 +51,7 @@ import { db, db2, dbDatabase } from "./Firebase";
 import { onValue, ref } from "firebase/database";
 import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { IoChatbubblesOutline } from "react-icons/io5";
+import KwhForecastChart from "./KwhForecastChart";
 
 // Data dummy untuk grafik detak jantung
 const heartRateData = [
@@ -160,7 +161,7 @@ const Dashboard2 = () => {
               <h2 className="text-xl font-semibold mb-4 text-black">
                 Record Prediction
               </h2>
-              <table className="w-full divide-y divide-black">
+              {/* <table className="w-full divide-y divide-black">
                 <thead className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <tr>
                     <th className="py-3 text-left">NUMBER</th>
@@ -187,7 +188,8 @@ const Dashboard2 = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table> */}
+              <KwhForecastChart />
             </div>
 
             {/* ====== BAGIAN STATISTIK ====== */}
@@ -213,7 +215,7 @@ const Dashboard2 = () => {
                   <div className="text-sm font-medium opacity-80">
                     Prediction Kwh per Month
                   </div>
-                  <div className="text-2xl font-bold font">{`${
+                  <div className=" font-bold font">{`${
                     Math.round(monthSumarry.predicted_total_kwh * 100) / 100
                   } Kwh`}</div>
                 </div>
@@ -221,7 +223,7 @@ const Dashboard2 = () => {
                   <div className="text-sm font-medium opacity-80">
                     Price per Month
                   </div>
-                  <div className="text-2xl font-bold font">{`Rp. ${monthSumarry.predicted_total_cost?.toLocaleString(
+                  <div className=" font-bold font">{`Rp. ${monthSumarry.predicted_total_cost?.toLocaleString(
                     "id-ID"
                   )}`}</div>
                 </div>

@@ -14,7 +14,7 @@ import {
   TimeScale,
 } from "chart.js";
 import "chartjs-adapter-date-fns";
-// import { firestore, loginFirestore } from "../firebase/firestore";
+import { firestore, loginFirestore } from "./firebase/firestore";
 import {
   collection,
   query,
@@ -95,8 +95,8 @@ function KwhForecastChart() {
           {
             label: "kWh Aktual",
             data: actualData,
-            borderColor: "#A0E8A8",
-            backgroundColor: "#A0E8A8",
+            borderColor: "#74f078",
+            backgroundColor: "#74f078",
             tension: 0.3,
             pointRadius: 1,
           },
@@ -108,9 +108,9 @@ function KwhForecastChart() {
                 y: doc.data().predicted_energy_kwh,
               };
             }),
-            borderColor: "#C6A8FF",
+            borderColor: "#9865fa",
             backgroundColor: "#C6A8FF",
-            borderDash: [5, 5],
+            borderDash: [10, 10],
             tension: 0.3,
             pointRadius: 1,
           },
@@ -133,24 +133,23 @@ function KwhForecastChart() {
           unit: "month",
           tooltipFormat: "dd MMM yyyy HH:mm",
         },
-        grid: { color: "rgba(255, 255, 255, 0.1)" },
-        ticks: { color: "#a0a0a0" },
+        grid: { color: "rgba(0, 0, 0, 0)" },
+        ticks: { color: "#000" },
       },
       y: {
         beginAtZero: false,
-        grid: { color: "rgba(255, 255, 255, 0.1)" },
-        ticks: { color: "#a0a0a0" },
+        grid: { color: "rgba(0, 0, 0, 0)" },
+        ticks: { color: "#0000" },
       },
     },
     plugins: {
-      legend: { position: "top", labels: { color: "#e0e0e0" } },
+      legend: { position: "top", labels: { color: "#0000000" } },
     },
   };
 
   return (
-    <div className="page-container">
-      test
-      <div className="line-chart-wrapper">
+    <div className="page-container ">
+      <div className="line-chart-wrapper mx-auto">
         {loading || !chartData ? (
           <p className="loading-text">Memuat data historis & prediksi...</p>
         ) : (
