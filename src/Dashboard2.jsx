@@ -50,6 +50,7 @@ ChartJS.register(
 import { db, db2, dbDatabase } from "./Firebase";
 import { onValue, ref } from "firebase/database";
 import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+import { IoChatbubblesOutline } from "react-icons/io5";
 
 // Data dummy untuk grafik detak jantung
 const heartRateData = [
@@ -76,6 +77,7 @@ const cholesterolData = [
 const Dashboard2 = () => {
   const [monthSumarry, setMonthSumarry] = useState([]);
   const [dataMonthSummary, setDataMonthSummary] = useState([]);
+  const [ptot, setPtot] = useState(0);
   async function getDatabase() {
     const snapshot = await getDocs(
       collection(dbDatabase, "monthly_forecast_summary")
@@ -99,7 +101,26 @@ const Dashboard2 = () => {
     }
   }
   useEffect(() => {
+    // localStorage.setItem("Ptot", 0);
     getDatabase();
+  }, []);
+
+  useEffect(() => {
+    console.log("Fetching data from Firebase...");
+    const panelRef = ref(db2, "sensor_data");
+
+    const unsubscribe = onValue(
+      panelRef,
+      (snapshot) => {
+        const data = snapshot.val();
+        setPtot(data?.Ptot);
+      },
+      (error) => {
+        console.error("Error membaca data:", error);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
@@ -174,48 +195,37 @@ const Dashboard2 = () => {
               {/* Card INVOICE */}
               <div className="p-4 rounded-lg shadow-xl h-40 flex flex-col justify-between bg-[#ffd53f] text-black">
                 <div className="flex justify-between items-start">
-                  <div className="text-sm font-medium opacity-80">
-                    Prediction Price per Month
+                  <div className="text-xl  font-semibold opacity-80">
+                    Power Total
                   </div>
                 </div>
-                <div className="flex justify-around items-end">
-                  <div>
-                    <div className="text-xl font-bold">{`Rp. ${(
-                      monthSumarry.predicted_total_kwh *
-                      monthSumarry.price_per_kwh
-                    ).toLocaleString("id-ID")}`}</div>
-                    <div className="text-xs opacity-70">UPCOMING INVOICE</div>
-                  </div>
-                  <div className="flex items-center text-xs font-semibold">
-                    <svg
-                      className="w-3 h-3 mr-1"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M5 10l7-7m0 0l7 7m-7-7v18"
-                      ></path>
-                    </svg>
-                    1.2%
-                  </div>
+                <div className="text-2xl font-bold">{`${ptot} Kw`}</div>
+                <div className="text-sm flex items-end">
+                  <IoChatbubblesOutline size={16} className="me-2" /> Displays
+                  Power Total
                 </div>
               </div>
 
               {/* Card PALLET DELIVERIES */}
-              {console.log("ini adalah mont sumary")}
-              {console.log(monthSumarry)}
+
               <div className="bg-white p-4 rounded-lg shadow-xl h-40 flex flex-col justify-between text-black">
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col justify-between items-start">
                   <div className="text-sm font-medium opacity-80">
                     Prediction Kwh per Month
                   </div>
+                  <div className="text-2xl font-bold font">{`${
+                    Math.round(monthSumarry.predicted_total_kwh * 100) / 100
+                  } Kwh`}</div>
                 </div>
-                <div className="flex justify-between items-end">
+                <div className="flex flex-col py-2 justify-between items-start">
+                  <div className="text-sm font-medium opacity-80">
+                    Price per Month
+                  </div>
+                  <div className="text-2xl font-bold font">{`Rp. ${monthSumarry.predicted_total_cost?.toLocaleString(
+                    "id-ID"
+                  )}`}</div>
+                </div>
+                {/* <div className="flex justify-between items-end">
                   <div className="text-2xl font-bold">{`${
                     Math.round(monthSumarry.predicted_total_kwh * 100) / 100
                   } Kwh`}</div>
@@ -236,7 +246,7 @@ const Dashboard2 = () => {
                     </svg>
                     2.6%
                   </div>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>
