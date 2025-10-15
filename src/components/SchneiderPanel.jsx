@@ -7,82 +7,130 @@ import {
 } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 
 // --- Firebase Integration (Digabungkan dalam satu file) ---
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app"; 
 import { getDatabase, ref, onValue } from "firebase/database";
-import { getAuth, signInAnonymously } from "firebase/auth";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+
+// =====================================================================================
+// !! PENTING SEKALI: PENYEBAB DATA TIDAK MASUK ADA DI SINI !!
+// =====================================================================================
+// Error koneksi atau data kosong hampir 100% disebabkan oleh Firebase Security Rules
+// yang memblokir akses baca (read) secara default.
+//
+// CARA MEMPERBAIKI (WAJIB DILAKUKAN):
+// 1. Buka project Firebase Anda di website Firebase.
+// 2. Pada menu di sebelah kiri, pilih "Build" > "Realtime Database".
+// 3. Klik tab "Rules" (Aturan) di bagian atas.
+// 4. Anda akan melihat kode seperti { "rules": { ".read": "false", ".write": "false" } }.
+// 5. Ganti SELURUH isinya dengan kode di bawah ini, lalu klik "Publish":
+//
+// {
+//   "rules": {
+//     ".read": true,
+//     ".write": true
+//   }
+// }
+//
+// Setelah Anda menekan "Publish", aplikasi akan langsung bisa membaca data.
+// =====================================================================================
+
 
 // Konfigurasi Firebase RTDB Anda
 const firebaseConfigRTDB = {
-  apiKey: "AIzaSyDsM-j-nbNPMdTz1irbXOXD1b8bS_mjrPk",
+  apiKey: "AIzaSyCwOjCx_FHmZdlIiW_3rLYx93-rvTFgzC4",
   databaseURL: "https://monitoring123-b4e41-default-rtdb.asia-southeast1.firebasedatabase.app/",
 };
 
-// Inisialisasi aplikasi khusus RTDB
-const rtdbApp = initializeApp(firebaseConfigRTDB, "rtdbApp");
+// Fungsi aman untuk inisialisasi Firebase agar tidak duplikat
+function getFirebaseApp() {
+    const apps = getApps();
+    const existingApp = apps.find(app => app.name === "rtdbApp");
+    if (existingApp) {
+        return existingApp;
+    }
+    return initializeApp(firebaseConfigRTDB, "rtdbApp");
+}
+
+const rtdbApp = getFirebaseApp();
 const dbRTDB = getDatabase(rtdbApp);
 const authRTDB = getAuth(rtdbApp);
 
-// Fungsi login anonim sekali jalan
-const loginRTDB = async () => {
-  try {
-    if (authRTDB.currentUser) return; // Jika sudah login, tidak perlu login lagi
-    await signInAnonymously(authRTDB);
-    console.log("✅ Login anonim ke RTDB berhasil");
-  } catch (error) {
-    console.error("❌ Gagal login RTDB:", error.message);
-  }
-};
-// --- End of Firebase Integration ---
-
 /**
  * Komponen SchneiderPanel 3D Interaktif dengan data Realtime Firebase.
- * - Menggunakan WebGLRenderer untuk model 3D dan CSS3DRenderer untuk overlay UI.
- * - Mengambil data dari Firebase RTDB dan menampilkannya di display panel.
- * - Mendeteksi anomali berdasarkan ambang batas yang ditentukan.
- *
- * Cara Penggunaan:
- * <div style={{ width: '100%', height: '600px' }}>
- * <SchneiderPanel />
- * </div>
  */
 export default function SchneiderPanel() {
   const hostRef = useRef(null);
   const rafRef = useRef(null);
-  const [firebaseData, setFirebaseData] = useState({});
+  const [firebaseData, setFirebaseData] = useState(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Daftar data yang akan ditampilkan di panel, beserta batas anomali
   const pmDisplayConfig = [
-    { key: "Vavg", title: "Tegangan Rata-rata", unit: "V", min: 11000, max: 22000, decimals: 2 },
+    { key: "Vavg_calc", title: "Tegangan Rata-rata", unit: "V", min: 11000, max: 22000, decimals: 2 },
     { key: "Iavg", title: "Arus Rata-rata", unit: "A", min: 0, max: 10, decimals: 4 },
     { key: "Ptot", title: "Daya Total", unit: "kW", min: 0, max: 1000, decimals: 4 },
     { key: "Edel", title: "Energi Terpakai", unit: "kWh", min: -Infinity, max: Infinity, decimals: 2 },
-    { key: "v1", title: "Tegangan Fase 1", unit: "V", min: 19000, max: 22000, decimals: 2 },
-    { key: "v2", title: "Tegangan Fase 2", unit: "V", min: 19000, max: 22000, decimals: 2 },
-    { key: "v3", title: "Tegangan Fase 3", unit: "V", min: 19000, max: 22000, decimals: 2 },
+    { key: "V1", title: "Tegangan Fase 1", unit: "V", min: 19000, max: 22000, decimals: 2 },
+    { key: "V2", title: "Tegangan Fase 2", unit: "V", min: 19000, max: 22000, decimals: 2 },
+    { key: "V3", title: "Tegangan Fase 3", unit: "V", min: 19000, max: 22000, decimals: 2 },
   ];
 
-  // 1. useEffect untuk mengambil data dari Firebase
+  // 1. useEffect untuk mengambil data dari Firebase (METODE PALING ROBUST)
   useEffect(() => {
-    const fetchData = async () => {
-      await loginRTDB();
-      const sensorRef = ref(dbRTDB, "sensor_data");
+    console.log("1. Komponen dimuat, menyiapkan listener autentikasi...");
+    
+    // Listener ini akan bereaksi terhadap status login (termasuk login anonim)
+    const authUnsubscribe = onAuthStateChanged(authRTDB, (user) => {
+        if (user) {
+            // Jika user berhasil login (termasuk anonim)
+            console.log("2. Autentikasi berhasil (User UID:", user.uid, "). Memasang listener data...");
+            
+            const sensorRef = ref(dbRTDB, "sensor_data");
+            const dataUnsubscribe = onValue(sensorRef, 
+                (snapshot) => {
+                    console.log("3. Listener data merespon.");
+                    const data = snapshot.val();
+                    if (data) {
+                        console.log("   ✅ Data sensor diterima:", data);
+                        setFirebaseData(data);
+                        setError(null);
+                    } else {
+                        console.log("   ⚠️ Data kosong pada path 'sensor_data'.");
+                        setError("Data pada path 'sensor_data' tidak ditemukan.");
+                    }
+                    setIsLoading(false);
+                }, 
+                (err) => {
+                    console.error("   ❌ GAGAL: Listener data error:", err);
+                    setError("Akses Ditolak. Periksa aturan keamanan (Rules) database Anda.");
+                    setIsLoading(false);
+                }
+            );
+            
+            // Simpan fungsi unsubscribe untuk data listener
+            return () => {
+                console.log("Melepaskan listener data.");
+                dataUnsubscribe();
+            };
 
-      const unsubscribe = onValue(sensorRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          console.log("📡 Data sensor realtime diterima:", data);
-          setFirebaseData(data);
         } else {
-          console.log("⚠️ Data sensor tidak ditemukan di Firebase.");
+            // Jika tidak ada user, coba login anonim
+            console.log("2. Belum ada user, mencoba login anonim...");
+            signInAnonymously(authRTDB).catch((err) => {
+                console.error("❌ GAGAL: Login anonim error:", err);
+                setError("Gagal login ke Firebase. Periksa koneksi atau konfigurasi Firebase.");
+                setIsLoading(false);
+            });
         }
-      });
+    });
 
-      return () => unsubscribe();
+    // Fungsi cleanup: akan dipanggil saat komponen di-unmount
+    return () => {
+      console.log("Melepaskan listener autentikasi.");
+      authUnsubscribe();
     };
-
-    fetchData();
-  }, []);
+  }, []); // Array dependensi kosong, hanya dijalankan sekali
 
 
   // 2. useEffect untuk setup scene Three.js dan UI
@@ -90,12 +138,11 @@ export default function SchneiderPanel() {
     const host = hostRef.current;
     if (!host) return;
     
-    // --- Inisialisasi Three.js ---
     let width = host.clientWidth;
     let height = host.clientHeight || 400;
 
     const scene = new THREE.Scene();
-    scene.background = null; // Transparan
+    scene.background = null;
 
     const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
     camera.position.set(0, 5, 25);
@@ -114,15 +161,14 @@ export default function SchneiderPanel() {
     cssRenderer.domElement.style.pointerEvents = "none";
     host.appendChild(cssRenderer.domElement);
 
-    const controls = new OrbitControls(camera, cssRenderer.domElement);
+    const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
+    controls.dampingFactor = 0.06; 
     controls.minDistance = 10;
     controls.maxDistance = 50;
     controls.target.set(0, 4, 0);
     controls.enableZoom = false;
 
-    // --- Pencahayaan ---
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
     dirLight.position.set(15, 20, 10);
@@ -132,17 +178,15 @@ export default function SchneiderPanel() {
     scene.add(dirLight);
     scene.add(new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5));
 
-    // --- Lantai Bayangan ---
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(100, 100),
       new THREE.ShadowMaterial({ opacity: 0.3 })
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -6;
+    floor.position.y = -3.0;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // --- Material ---
     const mat = {
         panelWhite: new THREE.MeshStandardMaterial({ color: 0xe5e5e5, roughness: 0.6 }),
         panelBlack: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 }),
@@ -151,10 +195,9 @@ export default function SchneiderPanel() {
         screen: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x1a1a1a, roughness: 0.2 }),
     };
 
-    // --- Geometri Panel ---
     const panelGroup = new THREE.Group();
     scene.add(panelGroup);
-    panelGroup.position.y = -1;
+    panelGroup.position.y = 1.5;
 
     function createBox(width, height, depth, material, position) {
         const geometry = new THREE.BoxGeometry(width, height, depth);
@@ -195,10 +238,13 @@ export default function SchneiderPanel() {
     mainBreaker.add(breakerSwitch);
     panelGroup.add(mainBreaker);
 
+    const greenLabelTop = createBox(panelWidth - 0.2, 0.4, 0.1, mat.schneiderGreen, { x: -panelWidth/2, y: 5.7, z: panelDepth / 2 - 0.1 });
+    const greenLabelBotLeft = createBox(3, 0.2, 0.1, mat.schneiderGreen, { x: -5.5, y: 1.2, z: panelDepth / 2 + 0.1 });
+    const greenLabelBotRight = createBox(3, 0.2, 0.1, mat.schneiderGreen, { x: 5.5, y: 1.2, z: panelDepth / 2 + 0.1 });
+    panelGroup.add(greenLabelTop, greenLabelBotLeft, greenLabelBotRight);
 
-    // --- CSS3D Object untuk Display ---
     const pmEl = document.createElement("div");
-    pmEl.style.width = "280px"; // Sedikit lebih lebar
+    pmEl.style.width = "280px";
     pmEl.style.pointerEvents = "auto";
     pmEl.style.userSelect = "none";
     pmEl.style.fontFamily = "'Orbitron', sans-serif";
@@ -225,21 +271,17 @@ export default function SchneiderPanel() {
     `;
 
     const pmObject = new CSS3DObject(pmEl);
-    pmObject.position.set(0, 4.5, 4.5); // Maju sedikit agar tidak tertutup
+    pmObject.position.set(0, 4.5, 4.5);
     pmObject.scale.set(0.04, 0.04, 0.04);
     panelGroup.add(pmObject);
 
-    // --- Event Listeners untuk Tombol Navigasi ---
     const pmPrevBtn = pmEl.querySelector("#pm-prev");
     const pmNextBtn = pmEl.querySelector("#pm-next");
-
     const prevHandler = () => setCurrentIndex(prev => (prev - 1 + pmDisplayConfig.length) % pmDisplayConfig.length);
     const nextHandler = () => setCurrentIndex(prev => (prev + 1) % pmDisplayConfig.length);
-
     pmPrevBtn.addEventListener('click', prevHandler);
     pmNextBtn.addEventListener('click', nextHandler);
     
-    // --- Kontrol Kamera & Interaksi ---
     let targetDistance = camera.position.distanceTo(controls.target);
     let isUserInteracting = false;
     let needsReset = false;
@@ -266,7 +308,6 @@ export default function SchneiderPanel() {
     controls.addEventListener('start', onInteractionStart);
     controls.addEventListener('end', onInteractionEnd);
 
-    // --- Resize Observer ---
     const ro = new ResizeObserver(() => {
         width = host.clientWidth;
         height = host.clientHeight || 400;
@@ -277,17 +318,13 @@ export default function SchneiderPanel() {
     });
     ro.observe(host);
 
-    // --- Animation Loop ---
     function animate() {
       rafRef.current = requestAnimationFrame(animate);
-
-      // Smooth zoom
       const currentDistance = camera.position.distanceTo(controls.target);
       const smoothedDistance = THREE.MathUtils.lerp(currentDistance, targetDistance, 0.08);
       const direction = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
       camera.position.copy(controls.target).addScaledVector(direction, smoothedDistance);
       
-      // Auto-rotate or reset
       if (needsReset) {
           panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, 0, 0.05);
           if (Math.abs(panelGroup.rotation.y) < 0.01) {
@@ -295,10 +332,9 @@ export default function SchneiderPanel() {
               needsReset = false;
           }
       } else if (!isUserInteracting) {
-          panelGroup.rotation.y += 0.002; // Perlambat rotasi
+          panelGroup.rotation.y += 0.0015;
       }
 
-      // Tampilkan/sembunyikan display berdasarkan sudut pandang
       const panelDirection = new THREE.Vector3(0, 0, 1).applyQuaternion(panelGroup.quaternion);
       const cameraDirection = new THREE.Vector3().subVectors(camera.position, panelGroup.position).normalize();
       const dotProduct = panelDirection.dot(cameraDirection);
@@ -312,7 +348,6 @@ export default function SchneiderPanel() {
     }
     animate();
 
-    // --- Cleanup ---
     return () => {
         cancelAnimationFrame(rafRef.current);
         ro.disconnect();
@@ -322,10 +357,8 @@ export default function SchneiderPanel() {
         pmPrevBtn.removeEventListener('click', prevHandler);
         pmNextBtn.removeEventListener('click', nextHandler);
         
-        if (host) {
-            host.removeChild(renderer.domElement);
-            host.removeChild(cssRenderer.domElement);
-        }
+        if (host.contains(renderer.domElement)) host.removeChild(renderer.domElement);
+        if (host.contains(cssRenderer.domElement)) host.removeChild(cssRenderer.domElement);
         
         renderer.dispose();
         scene.traverse(o => {
@@ -336,7 +369,7 @@ export default function SchneiderPanel() {
             }
         });
     };
-  }, []); // Hanya dijalankan sekali saat mount
+  }, []);
 
   // 3. useEffect untuk update UI display berdasarkan data Firebase
   useEffect(() => {
@@ -347,24 +380,70 @@ export default function SchneiderPanel() {
       const pmErrorOverlayEl = document.getElementById('pm-error-overlay');
       const pmErrorMessageEl = document.getElementById('pm-error-message');
 
-      if (!pmTitleEl || !firebaseData) return;
+      if (!pmTitleEl) return;
+      
+      if (error) {
+        pmTitleEl.textContent = "Error";
+        pmValueEl.textContent = ":(";
+        pmUnitEl.textContent = "";
+        pmScreenEl.style.backgroundColor = 'rgba(255, 82, 82, 0.95)';
+        pmErrorOverlayEl.style.display = 'flex';
+        pmErrorMessageEl.textContent = error;
+        return;
+      }
+
+      if (isLoading) {
+          pmTitleEl.textContent = "Menghubungkan...";
+          pmValueEl.textContent = "--";
+          pmUnitEl.textContent = "";
+          pmScreenEl.style.backgroundColor = 'rgba(158, 158, 158, 0.95)';
+          pmErrorOverlayEl.style.display = 'none';
+          return;
+      }
+      
+      if (!firebaseData) {
+        pmTitleEl.textContent = "Tidak Ada Data";
+        pmValueEl.textContent = "N/A";
+        pmUnitEl.textContent = "";
+        pmScreenEl.style.backgroundColor = 'rgba(158, 158, 158, 0.95)';
+        pmErrorOverlayEl.style.display = 'none';
+        return;
+      }
 
       const currentDisplay = pmDisplayConfig[currentIndex];
-      const value = firebaseData[currentDisplay.key] ?? 0;
-      const isAnomalous = value < currentDisplay.min || value > currentDisplay.max;
+      let value = 0;
+
+      if (currentDisplay.key === 'Vavg_calc') {
+        const v1 = firebaseData['V1'] ?? 0;
+        const v2 = firebaseData['V2'] ?? 0;
+        const v3 = firebaseData['V3'] ?? 0;
+        value = (v1 + v2 + v3) / 3;
+      } else {
+        value = firebaseData[currentDisplay.key] ?? 0;
+      }
       
-      // Cek anomali secara keseluruhan
       let overallAnomaly = null;
-      for(const item of pmDisplayConfig) {
-          const val = firebaseData[item.key] ?? 0;
-          if (val < item.min || val > item.max) {
-              overallAnomaly = item;
-              break;
+      if(firebaseData){
+          for(const item of pmDisplayConfig) {
+              let valToCheck = 0;
+              if (item.key === 'Vavg_calc') {
+                const v1 = firebaseData['V1'] ?? 0;
+                const v2 = firebaseData['V2'] ?? 0;
+                const v3 = firebaseData['V3'] ?? 0;
+                valToCheck = (v1 + v2 + v3) / 3;
+              } else {
+                valToCheck = firebaseData[item.key] ?? 0;
+              }
+
+              if (valToCheck < item.min || valToCheck > item.max) {
+                  overallAnomaly = item;
+                  break;
+              }
           }
       }
 
       pmTitleEl.textContent = currentDisplay.title;
-      pmValueEl.textContent = value.toFixed(currentDisplay.decimals);
+      pmValueEl.textContent = isNaN(value) ? '0.00' : value.toFixed(currentDisplay.decimals);
       pmUnitEl.textContent = currentDisplay.unit;
 
       if (overallAnomaly) {
@@ -376,7 +455,7 @@ export default function SchneiderPanel() {
           pmErrorOverlayEl.style.display = 'none';
       }
 
-  }, [firebaseData, currentIndex, pmDisplayConfig]);
+  }, [firebaseData, currentIndex, pmDisplayConfig, isLoading, error]);
 
   return (
     <div
@@ -392,3 +471,4 @@ export default function SchneiderPanel() {
     />
   );
 }
+
