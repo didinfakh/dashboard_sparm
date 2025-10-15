@@ -112,7 +112,7 @@ export const ProjectStats = () => {
 
   const limits = {
     Vavg: { min: 11000, max: 22000 },
-    Iavg: { min: 0, max: 10 },
+    Iavg: { min: 2000, max: 10 },
     Ptot: { min: 0, max: 1000 },
     Edel: { min: 0, max: Infinity }, // energi terpakai tidak dibatasi
     V1: { min: 19000, max: 22000 },
@@ -139,6 +139,9 @@ export const ProjectStats = () => {
         if (data) {
           setPanelData(data);
           console.log("Data terbaru diterima:", data);
+          // if (data && data.Ptot) {
+          localStorage.setItem("Ptot", data.Ptot);
+          // }
           const exceeded = [];
           for (const key in limits) {
             const limit = limits[key];
@@ -214,11 +217,11 @@ export const ProjectStats = () => {
       variant: "default",
     },
     {
-      title: "Energy Delivered",
-      id: "Edel",
-      satuan: "KWH",
+      title: "Average Voltage",
+      id: "Vavg",
+      satuan: "V",
       value: 24,
-      description: "Average current across all phases",
+      description: "Average Voltage across all phases",
       icon: <BsCalendarWeek size={16} />,
       variant: "primary",
     },
@@ -232,8 +235,8 @@ export const ProjectStats = () => {
           value={`${panelData.Iavg ? panelData.Iavg.toFixed(2) : 0} A`}
         />
         <StatCardLong
-          title="Average Voltage"
-          value={`${(panelData.Vavg / 100).toFixed(1) || 0} V`}
+          title="Energy Delivered"
+          value={`${(panelData.Edel / 100).toFixed(1) || 0} Kwh`}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
