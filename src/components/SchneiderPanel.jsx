@@ -1,4 +1,3 @@
-// SchneiderPanel.jsx
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
@@ -6,75 +5,97 @@ import {
   CSS3DRenderer,
   CSS3DObject,
 } from "three/examples/jsm/renderers/CSS3DRenderer.js";
-import { db, db2, dbDatabase } from "../Firebase";
-import { onValue, ref } from "firebase/database";
-import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
+
+// --- Firebase Integration (Digabungkan dalam satu file) ---
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, onValue } from "firebase/database";
+import { getAuth, signInAnonymously } from "firebase/auth";
+
+// Konfigurasi Firebase RTDB Anda
+const firebaseConfigRTDB = {
+  apiKey: "AIzaSyDsM-j-nbNPMdTz1irbXOXD1b8bS_mjrPk",
+  databaseURL: "https://monitoring123-b4e41-default-rtdb.asia-southeast1.firebasedatabase.app/",
+};
+
+// Inisialisasi aplikasi khusus RTDB
+const rtdbApp = initializeApp(firebaseConfigRTDB, "rtdbApp");
+const dbRTDB = getDatabase(rtdbApp);
+const authRTDB = getAuth(rtdbApp);
+
+// Fungsi login anonim sekali jalan
+const loginRTDB = async () => {
+  try {
+    if (authRTDB.currentUser) return; // Jika sudah login, tidak perlu login lagi
+    await signInAnonymously(authRTDB);
+    console.log("✅ Login anonim ke RTDB berhasil");
+  } catch (error) {
+    console.error("❌ Gagal login RTDB:", error.message);
+  }
+};
+// --- End of Firebase Integration ---
 
 /**
- * SchneiderPanel
- * - Responsive: menyesuaikan parent (w-full)
- * - Menggunakan WebGLRenderer + CSS3DRenderer untuk overlay HTML (navigasi + error)
- * - Canvas texture pada layar untuk menampilkan angka yang up-to-date (mirip display PM)
+ * Komponen SchneiderPanel 3D Interaktif dengan data Realtime Firebase.
+ * - Menggunakan WebGLRenderer untuk model 3D dan CSS3DRenderer untuk overlay UI.
+ * - Mengambil data dari Firebase RTDB dan menampilkannya di display panel.
+ * - Mendeteksi anomali berdasarkan ambang batas yang ditentukan.
  *
- * Cara pakai:
- * <div style={{ width: '100%', height: 600 }}>
- *   <SchneiderPanel />
+ * Cara Penggunaan:
+ * <div style={{ width: '100%', height: '600px' }}>
+ * <SchneiderPanel />
  * </div>
  */
 export default function SchneiderPanel() {
-  const screenCanvasRef = useRef(null);
-  const screenTextureRef = useRef(null);
-
   const hostRef = useRef(null);
   const rafRef = useRef(null);
-  const [panelData, setPanelData] = useState({});
-  const [monthSumarry, setMonthSumarry] = useState([]);
+  const [firebaseData, setFirebaseData] = useState({});
+  const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Daftar data yang akan ditampilkan di panel, beserta batas anomali
+  const pmDisplayConfig = [
+    { key: "Vavg", title: "Tegangan Rata-rata", unit: "V", min: 11000, max: 22000, decimals: 2 },
+    { key: "Iavg", title: "Arus Rata-rata", unit: "A", min: 0, max: 10, decimals: 4 },
+    { key: "Ptot", title: "Daya Total", unit: "kW", min: 0, max: 1000, decimals: 4 },
+    { key: "Edel", title: "Energi Terpakai", unit: "kWh", min: -Infinity, max: Infinity, decimals: 2 },
+    { key: "v1", title: "Tegangan Fase 1", unit: "V", min: 19000, max: 22000, decimals: 2 },
+    { key: "v2", title: "Tegangan Fase 2", unit: "V", min: 19000, max: 22000, decimals: 2 },
+    { key: "v3", title: "Tegangan Fase 3", unit: "V", min: 19000, max: 22000, decimals: 2 },
+  ];
+
+  // 1. useEffect untuk mengambil data dari Firebase
   useEffect(() => {
-    console.log("Fetching data from Firebase...");
-    // getDatabase();
-    const panelRef = ref(db2, "sensor_data");
+    const fetchData = async () => {
+      await loginRTDB();
+      const sensorRef = ref(dbRTDB, "sensor_data");
 
-    const unsubscribe = onValue(
-      panelRef,
-      (snapshot) => {
+      const unsubscribe = onValue(sensorRef, (snapshot) => {
         const data = snapshot.val();
         if (data) {
-          console.log("ini adalah console.log data dari firebase");
-          console.log(data);
-          setPanelData(data);
+          console.log("📡 Data sensor realtime diterima:", data);
+          setFirebaseData(data);
+        } else {
+          console.log("⚠️ Data sensor tidak ditemukan di Firebase.");
         }
-      },
-      (error) => {
-        console.error("Error membaca data:", error);
-      }
-    );
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    };
+
+    fetchData();
   }, []);
 
-  useEffect(() => {
-    // add Orbitron font link (optional, untuk style mirip device)
-    const fontLinkId = "orbitron-google-font";
-    if (!document.getElementById(fontLinkId)) {
-      const link = document.createElement("link");
-      link.id = fontLinkId;
-      link.rel = "stylesheet";
-      link.href =
-        "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap";
-      document.head.appendChild(link);
-    }
 
+  // 2. useEffect untuk setup scene Three.js dan UI
+  useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
-
-    // sizes
+    
+    // --- Inisialisasi Three.js ---
     let width = host.clientWidth;
     let height = host.clientHeight || 400;
 
-    // scene + camera + renderers
     const scene = new THREE.Scene();
-    scene.background = null;
+    scene.background = null; // Transparan
 
     const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
     camera.position.set(0, 5, 25);
@@ -82,9 +103,7 @@ export default function SchneiderPanel() {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(width, height);
-    renderer.setClearColor(0x000000, 0);
     renderer.shadowMap.enabled = true;
-    renderer.domElement.style.display = "block";
     host.appendChild(renderer.domElement);
 
     const cssRenderer = new CSS3DRenderer();
@@ -92,22 +111,20 @@ export default function SchneiderPanel() {
     cssRenderer.domElement.style.position = "absolute";
     cssRenderer.domElement.style.top = "0";
     cssRenderer.domElement.style.left = "0";
-    cssRenderer.domElement.style.pointerEvents = "none"; // default none; each CSS3DObject element sets its own pointerEvents
+    cssRenderer.domElement.style.pointerEvents = "none";
     host.appendChild(cssRenderer.domElement);
 
-    // controls
     const controls = new OrbitControls(camera, cssRenderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
+    controls.dampingFactor = 0.05;
     controls.minDistance = 10;
     controls.maxDistance = 50;
     controls.target.set(0, 4, 0);
-    controls.enableZoom = false; // use wheel handler custom zoom
-    controls.rotateSpeed = 0.6;
+    controls.enableZoom = false;
 
-    // lighting
-    scene.add(new THREE.AmbientLight(0xffffff, 0.45));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
+    // --- Pencahayaan ---
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
     dirLight.position.set(15, 20, 10);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 1024;
@@ -115,643 +132,179 @@ export default function SchneiderPanel() {
     scene.add(dirLight);
     scene.add(new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5));
 
-    // floor (shadow)
+    // --- Lantai Bayangan ---
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(100, 100),
-      new THREE.ShadowMaterial({ opacity: 0.28 })
+      new THREE.ShadowMaterial({ opacity: 0.3 })
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -6;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // materials
+    // --- Material ---
     const mat = {
-      panelWhite: new THREE.MeshStandardMaterial({
-        color: 0xe5e5e5,
-        roughness: 0.6,
-      }),
-      panelBlack: new THREE.MeshStandardMaterial({
-        color: 0x222222,
-        roughness: 0.5,
-      }),
-      schneiderGreen: new THREE.MeshStandardMaterial({
-        color: 0x3dcd58,
-        roughness: 0.6,
-      }),
-      switchRed: new THREE.MeshStandardMaterial({
-        color: 0xff4136,
-        roughness: 0.5,
-      }),
-      screenMat: new THREE.MeshStandardMaterial({
-        color: 0x000000,
-        emissive: 0x0a0a0a,
-        roughness: 0.2,
-      }),
+        panelWhite: new THREE.MeshStandardMaterial({ color: 0xe5e5e5, roughness: 0.6 }),
+        panelBlack: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 }),
+        schneiderGreen: new THREE.MeshStandardMaterial({ color: 0x3dcd58, roughness: 0.7 }),
+        switchRed: new THREE.MeshStandardMaterial({ color: 0xff4136, roughness: 0.5 }),
+        screen: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x1a1a1a, roughness: 0.2 }),
     };
 
-    // helper to create boxes
-    function box(w, h, d, material, x, y, z, rx = 0, ry = 0, rz = 0) {
-      const g = new THREE.BoxGeometry(w, h, d);
-      const m = new THREE.Mesh(g, material);
-      m.position.set(x, y, z);
-      m.rotation.set(rx, ry, rz);
-      m.castShadow = true;
-      m.receiveShadow = true;
-      return m;
-    }
-
+    // --- Geometri Panel ---
     const panelGroup = new THREE.Group();
     scene.add(panelGroup);
     panelGroup.position.y = -1;
 
-    // build approximate model (more pieces to approach reference)
-    const panelWidth = 7.2;
+    function createBox(width, height, depth, material, position) {
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        const box = new THREE.Mesh(geometry, material);
+        box.position.set(position.x, position.y, position.z);
+        box.castShadow = true;
+        box.receiveShadow = true;
+        return box;
+    }
+    
     const panelDepth = 4;
-
-    // top panels
+    const panelWidth = 7.2;
     const totalTopWidth = panelWidth * 2;
     const leftTopWidth = totalTopWidth / 3 + 2;
-    const rightTopWidth = (totalTopWidth * 2) / 3 - 2;
-
-    const topLeft = box(
-      leftTopWidth,
-      3,
-      panelDepth,
-      mat.panelWhite,
-      -totalTopWidth / 2 + leftTopWidth / 2,
-      7.0,
-      0
-    );
-    const topRight = box(
-      rightTopWidth,
-      7,
-      panelDepth,
-      mat.panelWhite,
-      totalTopWidth / 2 - rightTopWidth / 2,
-      9.0,
-      0
-    );
-    panelGroup.add(topLeft, topRight);
-
-    // middle black blocks (the tall black central parts in reference)
-    const middleY = 3.25;
-    const middleLeftBlack = box(
-      panelWidth - 0.25,
-      4.5,
-      panelDepth - 0.6,
-      mat.panelBlack,
-      -panelWidth / 2,
-      middleY,
-      0.25
-    );
-    const middleRightBlack = box(
-      panelWidth - 0.25,
-      4.5,
-      panelDepth - 0.6,
-      mat.panelBlack,
-      panelWidth / 2,
-      middleY,
-      0.25
-    );
+    const rightTopWidth = totalTopWidth * 2 / 3 - 2;
+    
+    const topLeftPanel = createBox(leftTopWidth, 3, panelDepth, mat.panelWhite, { x: (-totalTopWidth / 2) + (leftTopWidth / 2), y: 7.0, z: 0 });
+    const topRightPanel = createBox(rightTopWidth, 7, panelDepth, mat.panelWhite, { x: (totalTopWidth / 2) - (rightTopWidth / 2), y: 9.0, z: 0 });
+    panelGroup.add(topLeftPanel, topRightPanel);
+    
+    const middleLeftBlack = createBox(panelWidth - 0.2, 4.5, panelDepth - 0.5, mat.panelBlack, { x: -panelWidth / 2, y: 3.25, z: 0.25 });
+    const middleRightBlack = createBox(panelWidth - 0.2, 4.5, panelDepth - 0.5, mat.panelBlack, { x: panelWidth / 2, y: 3.25, z: 0.25 });
     panelGroup.add(middleLeftBlack, middleRightBlack);
 
-    // bottom panels
-    const bottomY = -1.75;
-    const bottomLeft = box(
-      panelWidth,
-      5.5,
-      panelDepth,
-      mat.panelWhite,
-      -panelWidth / 2,
-      bottomY,
-      0
-    );
-    const bottomRight = box(
-      panelWidth,
-      5.5,
-      panelDepth,
-      mat.panelWhite,
-      panelWidth / 2,
-      bottomY,
-      0
-    );
+    const bottomLeft = createBox(panelWidth, 5.5, panelDepth, mat.panelWhite, { x: -panelWidth / 2, y: -1.75, z: 0 });
+    const bottomRight = createBox(panelWidth, 5.5, panelDepth, mat.panelWhite, { x: panelWidth / 2, y: -1.75, z: 0 });
     panelGroup.add(bottomLeft, bottomRight);
 
-    // bottom middle recess
-    const bottomMiddleRecess = box(
-      4,
-      5,
-      panelDepth - 1,
-      mat.panelWhite,
-      0,
-      -2.0,
-      1.8
-    );
+    const bottomMiddleRecess = createBox(4, 5, panelDepth - 1, mat.panelWhite, { x: 0, y: -2.0, z: 1.75 });
     panelGroup.add(bottomMiddleRecess);
-
-    // slots & labels
-    const slot1 = box(
-      1,
-      1.5,
-      0.1,
-      mat.panelBlack,
-      -5.5,
-      -0.5,
-      panelDepth / 2 + 0.1
-    );
-    const slot2 = box(
-      1,
-      1.5,
-      0.1,
-      mat.panelBlack,
-      -5.5,
-      -3.0,
-      panelDepth / 2 + 0.1
-    );
-    const slot3 = box(
-      1,
-      1.5,
-      0.1,
-      mat.panelBlack,
-      5.5,
-      0,
-      panelDepth / 2 + 0.1
-    );
-    const slot4 = box(
-      1,
-      1.5,
-      0.1,
-      mat.panelBlack,
-      5.5,
-      -2.5,
-      panelDepth / 2 + 0.1
-    );
-    panelGroup.add(slot1, slot2, slot3, slot4);
-
-    // main breaker + switch
-    const mainBreaker = box(2, 4, 1.5, mat.panelBlack, 0, -2.0, 2.75);
-    const breakerSwitch = box(
-      0.5,
-      2.5,
-      0.3,
-      mat.switchRed,
-      0,
-      0.3,
-      1.5 / 2 + 0.18
-    );
+    
+    const meter1 = createBox(1.0, 1.0, 0.2, mat.screen, { x: 3.0, y: 10.0, z: panelDepth / 2 + 0.1 });
+    const meter2 = createBox(2.5, 2.0, 0.2, mat.screen, { x: 5.5, y: 10.0, z: panelDepth / 2 + 0.1 });
+    panelGroup.add(meter1, meter2);
+    
+    const mainBreaker = createBox(2, 4, 1.5, mat.panelBlack, { x: 0, y: -2.0, z: 2.75 });
+    const breakerSwitch = createBox(0.5, 2.5, 0.3, mat.switchRed, { x: 0, y: 0.3, z: (1.5 / 2) + (0.3 / 2) });
     mainBreaker.add(breakerSwitch);
     panelGroup.add(mainBreaker);
 
-    // green labels (thin strips)
-    const greenTop = box(
-      panelWidth - 0.2,
-      0.38,
-      0.1,
-      mat.schneiderGreen,
-      -panelWidth / 2,
-      5.7,
-      panelDepth / 2 - 0.1
-    );
-    const greenBotLeft = box(
-      3,
-      0.2,
-      0.1,
-      mat.schneiderGreen,
-      -5.5,
-      1.2,
-      panelDepth / 2 + 0.1
-    );
-    const greenBotRight = box(
-      3,
-      0.2,
-      0.1,
-      mat.schneiderGreen,
-      5.5,
-      1.2,
-      panelDepth / 2 + 0.1
-    );
-    panelGroup.add(greenTop, greenBotLeft, greenBotRight);
 
-    // small front displays (two tiny screens)
-    const meter1 = box(
-      1.0,
-      1.0,
-      0.2,
-      mat.screenMat,
-      3.0,
-      10.0,
-      panelDepth / 2 + 0.12
-    );
-    const meter2 = box(
-      2.5,
-      2.0,
-      0.2,
-      mat.screenMat,
-      5.5,
-      10.0,
-      panelDepth / 2 + 0.12
-    );
-    panelGroup.add(meter1, meter2);
-
-    // Create a screen plane with a dynamic canvas texture (to show numbers similar to PM)
-    // const screenCanvas = document.createElement("canvas");
-    // screenCanvas.width = 800;
-    // screenCanvas.height = 360;
-    // const sctx = screenCanvas.getContext("2d");
-
-    const screenCanvas = document.createElement("canvas");
-    screenCanvas.width = 800;
-    screenCanvas.height = 360;
-    const sctx = screenCanvas.getContext("2d");
-    screenCanvasRef.current = screenCanvas; // 🔹 simpan referensi
-
-    function drawScreenText(
-      valueStr = "221.4",
-      title = "Average Voltage",
-      unit = "V"
-    ) {
-      // background
-
-      sctx.fillStyle = "#d9ea19"; // yellow-green
-      sctx.fillRect(0, 0, screenCanvas.width, screenCanvas.height);
-
-      // subtle inner bezel
-      sctx.fillStyle = "rgba(0,0,0,0.06)";
-      sctx.fillRect(8, 8, screenCanvas.width - 16, screenCanvas.height - 16);
-
-      // title
-      sctx.fillStyle = "#111";
-      sctx.font = "36px Orbitron, sans-serif";
-      sctx.textAlign = "left";
-      sctx.fillText(title, 30, 70);
-
-      // big value
-      sctx.font = "bold 120px Orbitron, sans-serif";
-      sctx.textAlign = "right";
-      sctx.fillText(valueStr, screenCanvas.width - 50, 220);
-
-      // unit small
-      sctx.font = "36px Orbitron, sans-serif";
-      sctx.fillText(unit, screenCanvas.width - 30, 280);
-    }
-
-    // initial draw
-    // drawScreenText("221.3", "Average Voltage", "V");
-
-    const screenTexture = new THREE.CanvasTexture(screenCanvas);
-    screenTextureRef.current = screenTexture;
-    screenTexture.minFilter = THREE.LinearFilter;
-    screenTexture.needsUpdate = true;
-
-    // screen plane and bezel
-    const screenPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(5.4, 2.5),
-      new THREE.MeshStandardMaterial({
-        map: screenTexture,
-        roughness: 0.1,
-        emissive: 0x111111,
-      })
-    );
-    screenPlane.position.set(0, 4.5, panelDepth / 2 + 0.12);
-    panelGroup.add(screenPlane);
-
-    // bezel frame (slightly rounded effect by layered boxes)
-    const bezelOuter = box(
-      5.8,
-      3.0,
-      0.25,
-      mat.panelWhite,
-      0,
-      4.5,
-      panelDepth / 2 + 0.06
-    );
-    panelGroup.add(bezelOuter);
-    const bezelInner = box(
-      5.6,
-      2.8,
-      0.26,
-      mat.panelBlack,
-      0,
-      4.5,
-      panelDepth / 2 + 0.07
-    );
-    panelGroup.add(bezelInner);
-
-    // small left & right nav button meshes (visual only)
-    const btnLeft = box(
-      0.9,
-      0.6,
-      0.15,
-      mat.panelBlack,
-      -1.6,
-      2.6,
-      panelDepth / 2 + 0.14
-    );
-    const btnRight = box(
-      0.9,
-      0.6,
-      0.15,
-      mat.panelBlack,
-      1.6,
-      2.6,
-      panelDepth / 2 + 0.14
-    );
-    panelGroup.add(btnLeft, btnRight);
-
-    // make CSS3D powermeter element (interactive overlay attached to same position)
+    // --- CSS3D Object untuk Display ---
     const pmEl = document.createElement("div");
-    pmEl.style.width = "360px";
-    pmEl.style.maxWidth = "60vw";
-    pmEl.style.borderRadius = "10px";
-    pmEl.style.boxShadow = "0 6px 18px rgba(0,0,0,0.45)";
-    pmEl.style.pointerEvents = "auto"; // allow clicks
+    pmEl.style.width = "280px"; // Sedikit lebih lebar
+    pmEl.style.pointerEvents = "auto";
     pmEl.style.userSelect = "none";
-    pmEl.style.fontFamily = "Orbitron, sans-serif";
-
-    // inner HTML (replicates the HTML UI you had)
+    pmEl.style.fontFamily = "'Orbitron', sans-serif";
+    pmEl.style.transition = "opacity 0.3s";
+    
     pmEl.innerHTML = `
-      <div id="pm-root" style="width:100%;background:rgba(210,210,210,0.88);border:3px solid rgba(10,10,10,0.38);border-radius:10px;padding:10px;box-sizing:border-box;">
-        <div id="pm-screen" style="background:rgba(205,220,57,0.98);padding:14px;border-radius:6px;border:2px inset #aaa;text-align:right;height:86px;display:flex;flex-direction:column;justify-content:center;transition:background-color 0.2s;">
-          <div id="pm-title" style="font-size:14px;text-align:left;margin-bottom:6px;color:#333">Total Power</div>
-          <div id="pm-value-container" style="display:flex;justify-content:flex-end;align-items:baseline">
-            <span id="pm-value" style="font-size:36px;font-weight:700"></span>
-            <span id="pm-unit" style="font-size:16px;margin-left:8px;font-weight:700">W</span>
+      <div id="pm-root" style="position: relative; width:100%; background:rgba(210, 210, 210, 0.8); border:3px solid rgba(10,10,10,0.4); border-radius:10px; padding:10px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); box-shadow: 0 4px 15px rgba(0,0,0,0.4);">
+        <div id="pm-screen" style="background:rgba(205, 220, 57, 0.95); padding:15px; border-radius:5px; border:2px inset #aaa; text-align:right; height:70px; display:flex; flex-direction:column; justify-content:center; transition: background-color 0.3s;">
+          <div id="pm-title" style="font-size:14px; text-align:left; margin-bottom:5px; color:#333; font-weight:400;"></div>
+          <div style="display:flex; justify-content:flex-end; align-items:baseline;">
+            <span id="pm-value" style="font-size:28px; font-weight:700;">0.00</span>
+            <span id="pm-unit" style="font-size:16px; margin-left:5px; font-weight:700;"></span>
           </div>
         </div>
-        <div id="pm-nav" style="display:flex;justify-content:space-between;margin-top:10px">
-          <button id="pm-prev" style="background:#444;color:#fff;border:1px solid #666;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:16px">◄</button>
-          <button id="pm-next" style="background:#444;color:#fff;border:1px solid #666;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:16px">►</button>
+        <div style="display:flex; justify-content:space-between; margin-top:10px;">
+          <button id="pm-prev" style="background:#444; color:white; border:1px solid #666; border-radius:5px; padding:5px 15px; cursor:pointer; font-size:18px;">◄</button>
+          <button id="pm-next" style="background:#444; color:white; border:1px solid #666; border-radius:5px; padding:5px 15px; cursor:pointer; font-size:18px;">►</button>
         </div>
-        <div id="pm-error-overlay" style="display:none;position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(211,47,47,0.85);border-radius:10px;align-items:center;justify-content:center;color:white;text-align:center;pointer-events:none;padding:10px">
-          <div id="pm-error-message" style="font-weight:700;font-size:14px"></div>
+        <div id="pm-error-overlay" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(211, 47, 47, 0.85); border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; text-align:center; padding:10px; pointer-events:none;">
+          <svg width="60px" height="60px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="8" stroke="white" stroke-width="1.5"/><path d="M9 9L7 11" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M7 9L9 11" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M15 9L13 11" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M13 9L15 11" stroke="white" stroke-width="1.5" stroke-linecap="round"/><path d="M17.5 17.5L20.5 20.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <div id="pm-error-message" style="font-weight:700; font-size:14px; margin-top:8px;"></div>
         </div>
       </div>
     `;
 
-    // Put pmEl into a CSS3DObject
-    const pmObj = new CSS3DObject(pmEl);
-    // position roughly matching 3D screen
-    pmObj.position.set(0, 4.5, 4);
+    const pmObject = new CSS3DObject(pmEl);
+    pmObject.position.set(0, 4.5, 4.5); // Maju sedikit agar tidak tertutup
+    pmObject.scale.set(0.04, 0.04, 0.04);
+    panelGroup.add(pmObject);
 
-    pmObj.scale.set(0.03, 0.03, 0.03);
-    panelGroup.add(pmObj);
+    // --- Event Listeners untuk Tombol Navigasi ---
+    const pmPrevBtn = pmEl.querySelector("#pm-prev");
+    const pmNextBtn = pmEl.querySelector("#pm-next");
 
-    // access elements for behavior
-    const pmTitle = pmEl.querySelector("#pm-title");
-    const pmValue = pmEl.querySelector("#pm-value");
-    const pmUnit = pmEl.querySelector("#pm-unit");
-    const pmPrev = pmEl.querySelector("#pm-prev");
-    const pmNext = pmEl.querySelector("#pm-next");
-    const pmRoot = pmEl.querySelector("#pm-root");
-    const pmScreen = pmEl.querySelector("#pm-screen");
-    const pmError = pmEl.querySelector("#pm-error-overlay");
-    const pmErrorMsg = pmEl.querySelector("#pm-error-message");
+    const prevHandler = () => setCurrentIndex(prev => (prev - 1 + pmDisplayConfig.length) % pmDisplayConfig.length);
+    const nextHandler = () => setCurrentIndex(prev => (prev + 1) % pmDisplayConfig.length);
 
-    // set pointer events on cssRenderer dom so interactions work for pmEl children
-    cssRenderer.domElement.style.pointerEvents = "auto";
-
-    // PM data definition (close to original)
-    const pmData = [
-      {
-        title: "Average Voltage",
-        unit: "V",
-        base: 220,
-        variation: 2,
-        min: 215,
-        max: 225,
-      },
-      {
-        title: "Average Current",
-        unit: "A",
-        base: 4.38,
-        variation: 0.8,
-        min: 1.0,
-        max: 7.0,
-      },
-      {
-        title: "Total Power",
-        unit: "kW",
-        base: 140.7,
-        variation: 20,
-        min: 0,
-        max: 180,
-      },
-      {
-        title: "Energy Consumed",
-        unit: "kWh",
-        base: 206351.23,
-        variation: 50,
-        min: 0,
-        max: 1e9,
-      },
-      {
-        title: "Phase 1 Voltage",
-        unit: "V",
-        base: 19944.865,
-        variation: 100,
-        min: 19000,
-        max: 21000,
-      },
-      {
-        title: "Phase 2 Voltage",
-        unit: "V",
-        base: 20548.154,
-        variation: 100,
-        min: 20000,
-        max: 21000,
-      },
-      {
-        title: "Phase 3 Voltage",
-        unit: "V",
-        base: 19810.431,
-        variation: 100,
-        min: 19000,
-        max: 21000,
-      },
-    ];
-
-    let currentIndex = 0;
-    let anomalyActive = false;
-    let anomalyTitle = null;
-    const lastVals = pmData.map(() => ({ value: "0", anomalous: false }));
-
-    function genVal(d) {
-      const v = d.base + (Math.random() - 0.5) * d.variation;
-      const isAnom = v < d.min || v > d.max;
-      // decimals logic
-      const decimals = Math.abs(d.base) >= 1000 ? 2 : d.base >= 100 ? 1 : 2;
-      return {
-        valStr: Number(v.toFixed(decimals)).toLocaleString("en-US"),
-        anom: isAnom,
-        raw: v,
-      };
-    }
-
-    function updatePMValues() {
-      pmData.forEach((d, i) => {
-        lastVals[i] = genVal(d);
-      });
-      const active = lastVals.find((x) => x.anom);
-      if (active) {
-        anomalyActive = true;
-        anomalyTitle = pmData[lastVals.indexOf(active)].title;
-      } else {
-        anomalyActive = false;
-        anomalyTitle = null;
-      }
-      renderPM();
-    }
-
-    function renderPM() {
-      const d = pmData[currentIndex];
-      console.log("ini adalah panel");
-      console.log(panelData);
-      const r = lastVals[currentIndex];
-      pmTitle.textContent = d.title;
-      pmValue.textContent = r.valStr;
-      pmUnit.textContent = d.unit;
-
-      // update canvas screen if showing a voltage/phase/current
-      // For readability, if numeric is very large (kWh), show condensed
-      // if (d.unit === "kWh") {
-      //   drawScreenText(r.valStr, d.title, d.unit);
-      // } else {
-      //   drawScreenText(
-      //     r.valStr + (d.unit && d.unit !== "" ? "" : ""),
-      //     d.title,
-      //     d.unit
-      //   );
-      // }
-      screenTexture.needsUpdate = true;
-
-      if (anomalyActive) {
-        pmRoot.classList.add("error-state");
-        pmScreen.style.background = "rgba(255,82,82,0.95)";
-        pmError.style.display = "flex";
-        pmErrorMsg.textContent = `ANOMALY: ${anomalyTitle}`;
-      } else {
-        pmRoot.classList.remove("error-state");
-        pmScreen.style.background = "rgba(205,220,57,0.95)";
-        pmError.style.display = "none";
-      }
-    }
-
-    pmPrev.addEventListener("click", (e) => {
-      e.stopPropagation();
-      currentIndex = (currentIndex - 1 + pmData.length) % pmData.length;
-      renderPM();
-    });
-    pmNext.addEventListener("click", (e) => {
-      e.stopPropagation();
-      currentIndex = (currentIndex + 1) % pmData.length;
-      renderPM();
-    });
-
-    // initial generation + periodic update
-    // updatePMValues();
-    // const pmInterval = setInterval(updatePMValues, 2000);
-
-    // camera distance smoothing via wheel
+    pmPrevBtn.addEventListener('click', prevHandler);
+    pmNextBtn.addEventListener('click', nextHandler);
+    
+    // --- Kontrol Kamera & Interaksi ---
     let targetDistance = camera.position.distanceTo(controls.target);
-    let isInteracting = false;
+    let isUserInteracting = false;
     let needsReset = false;
-    let targetRotY = null;
-    let interactionTimeout = null;
+    let interactionTimeout;
 
-    function onWheel(e) {
-      e.preventDefault();
-      isInteracting = true;
-      clearTimeout(interactionTimeout);
-      interactionTimeout = setTimeout(() => {
-        isInteracting = false;
-        needsReset = true;
-      }, 2200);
+    const onWheel = (event) => {
+        isUserInteracting = true;
+        clearTimeout(interactionTimeout);
+        interactionTimeout = setTimeout(() => { isUserInteracting = false; needsReset = true; }, 3000);
+        const zoomAmount = event.deltaY * 0.005;
+        targetDistance = THREE.MathUtils.clamp(targetDistance + zoomAmount * targetDistance, controls.minDistance, controls.maxDistance);
+    };
+    host.addEventListener('wheel', onWheel, { passive: false });
 
-      const zoomAmount = e.deltaY * 0.004;
-      targetDistance += zoomAmount * targetDistance;
-      targetDistance = THREE.MathUtils.clamp(
-        targetDistance,
-        controls.minDistance,
-        controls.maxDistance
-      );
-    }
-    host.addEventListener("wheel", onWheel, { passive: false });
+    const onInteractionStart = () => {
+        isUserInteracting = true;
+        needsReset = false;
+        clearTimeout(interactionTimeout);
+    };
+    const onInteractionEnd = () => {
+        clearTimeout(interactionTimeout);
+        interactionTimeout = setTimeout(() => { isUserInteracting = false; needsReset = true; }, 3000);
+    };
+    controls.addEventListener('start', onInteractionStart);
+    controls.addEventListener('end', onInteractionEnd);
 
-    controls.addEventListener("start", () => {
-      isInteracting = true;
-      needsReset = false;
-      targetRotY = null;
-      clearTimeout(interactionTimeout);
-    });
-    controls.addEventListener("end", () => {
-      clearTimeout(interactionTimeout);
-      interactionTimeout = setTimeout(() => {
-        isInteracting = false;
-        needsReset = true;
-      }, 2200);
-    });
-
-    // visibility logic: show pmEl only when panel faces camera
-    const panelDirection = new THREE.Vector3();
-    const cameraDirection = new THREE.Vector3();
-
-    // responsive: ResizeObserver
+    // --- Resize Observer ---
     const ro = new ResizeObserver(() => {
-      width = host.clientWidth;
-      height = host.clientHeight || 400;
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-      cssRenderer.setSize(width, height);
+        width = host.clientWidth;
+        height = host.clientHeight || 400;
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+        cssRenderer.setSize(width, height);
     });
     ro.observe(host);
 
-    // animation loop
+    // --- Animation Loop ---
     function animate() {
       rafRef.current = requestAnimationFrame(animate);
 
-      // smooth distance
-      const currDist = camera.position.distanceTo(controls.target);
-      const smoothed = THREE.MathUtils.lerp(currDist, targetDistance, 0.08);
-      const dir = new THREE.Vector3()
-        .subVectors(camera.position, controls.target)
-        .normalize();
-      camera.position.copy(controls.target).addScaledVector(dir, smoothed);
-
+      // Smooth zoom
+      const currentDistance = camera.position.distanceTo(controls.target);
+      const smoothedDistance = THREE.MathUtils.lerp(currentDistance, targetDistance, 0.08);
+      const direction = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+      camera.position.copy(controls.target).addScaledVector(direction, smoothedDistance);
+      
+      // Auto-rotate or reset
       if (needsReset) {
-        if (targetRotY === null) {
-          targetRotY =
-            Math.round(panelGroup.rotation.y / (Math.PI * 2)) * (Math.PI * 2);
-        }
-        panelGroup.rotation.y = THREE.MathUtils.lerp(
-          panelGroup.rotation.y,
-          targetRotY,
-          0.05
-        );
-        if (Math.abs(panelGroup.rotation.y - targetRotY) < 0.01) {
-          panelGroup.rotation.y = targetRotY;
-          needsReset = false;
-          targetRotY = null;
-        }
-      } else if (!isInteracting) {
-        panelGroup.rotation.y += 0.0035;
+          panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, 0, 0.05);
+          if (Math.abs(panelGroup.rotation.y) < 0.01) {
+              panelGroup.rotation.y = 0;
+              needsReset = false;
+          }
+      } else if (!isUserInteracting) {
+          panelGroup.rotation.y += 0.002; // Perlambat rotasi
       }
 
-      // dot product to check facing
-      panelDirection.set(0, 0, 1).applyQuaternion(panelGroup.quaternion);
-      cameraDirection
-        .subVectors(camera.position, panelGroup.position)
-        .normalize();
-      const dp = panelDirection.dot(cameraDirection);
-
-      if (dp > 0.12) {
-        pmEl.style.opacity = "1";
-        pmEl.style.pointerEvents = "auto";
-      } else {
-        pmEl.style.opacity = "0";
-        pmEl.style.pointerEvents = "none";
-      }
+      // Tampilkan/sembunyikan display berdasarkan sudut pandang
+      const panelDirection = new THREE.Vector3(0, 0, 1).applyQuaternion(panelGroup.quaternion);
+      const cameraDirection = new THREE.Vector3().subVectors(camera.position, panelGroup.position).normalize();
+      const dotProduct = panelDirection.dot(cameraDirection);
+      
+      pmEl.style.opacity = (dotProduct > 0.1) ? '1' : '0';
+      pmEl.style.pointerEvents = (dotProduct > 0.1) ? 'auto' : 'none';
 
       controls.update();
       renderer.render(scene, camera);
@@ -759,90 +312,80 @@ export default function SchneiderPanel() {
     }
     animate();
 
-    // cleanup on unmount
+    // --- Cleanup ---
     return () => {
-      ro.disconnect();
-      host.removeEventListener("wheel", onWheel);
-      // clearInterval(pmInterval);
-      cancelAnimationFrame(rafRef.current);
-
-      // remove appended DOM
-      try {
-        host.removeChild(renderer.domElement);
-      } catch (e) {}
-      try {
-        host.removeChild(cssRenderer.domElement);
-      } catch (e) {}
-
-      // dispose three resources
-      renderer.dispose();
-      screenTexture.dispose();
-      // traverse scene dispose geometries & materials
-      scene.traverse((o) => {
-        if (o.isMesh) {
-          o.geometry?.dispose?.();
-          if (Array.isArray(o.material))
-            o.material.forEach((m) => m.dispose?.());
-          else o.material?.dispose?.();
+        cancelAnimationFrame(rafRef.current);
+        ro.disconnect();
+        host.removeEventListener('wheel', onWheel);
+        controls.removeEventListener('start', onInteractionStart);
+        controls.removeEventListener('end', onInteractionEnd);
+        pmPrevBtn.removeEventListener('click', prevHandler);
+        pmNextBtn.removeEventListener('click', nextHandler);
+        
+        if (host) {
+            host.removeChild(renderer.domElement);
+            host.removeChild(cssRenderer.domElement);
         }
-      });
+        
+        renderer.dispose();
+        scene.traverse(o => {
+            if (o.isMesh) {
+                o.geometry?.dispose();
+                if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+                else o.material?.dispose();
+            }
+        });
     };
-  }, []);
+  }, []); // Hanya dijalankan sekali saat mount
 
-  // Tambahkan efek baru di bawah Firebase useEffect
-  // useEffect(() => {
-  //   console.log("Firebase berubah:", panelData);
-
-  //   if (!panelData || Object.keys(panelData).length === 0) return;
-
-  //   const value = panelData.Ptot ?? "0";
-  //   const title = "Total Power";
-  //   const unit = "kW";
-
-  //   const screenCanvas = Array.from(document.querySelectorAll("canvas")).find(
-  //     (c) => c.width === 800 && c.height === 360
-  //   );
-  //   if (!screenCanvas) return;
-
-  //   const ctx = screenCanvas.getContext("2d");
-  //   ctx.fillStyle = "#d9ea19";
-  //   ctx.fillRect(0, 0, screenCanvas.width, screenCanvas.height);
-
-  //   ctx.fillStyle = "#111";
-  //   ctx.font = "36px Orbitron, sans-serif";
-  //   ctx.textAlign = "left";
-  //   ctx.fillText(title, 30, 70);
-
-  //   ctx.font = "bold 120px Orbitron, sans-serif";
-  //   ctx.textAlign = "right";
-  //   ctx.fillText(String(value), screenCanvas.width - 50, 220);
-
-  //   ctx.font = "36px Orbitron, sans-serif";
-  //   ctx.fillText(unit, screenCanvas.width - 30, 280);
-
-  //   if (screenCanvas.texture) screenCanvas.texture.needsUpdate = true;
-  // }, [panelData]);
-
+  // 3. useEffect untuk update UI display berdasarkan data Firebase
   useEffect(() => {
-    if (!panelData || Object.keys(panelData).length === 0) return;
-    if (!screenCanvasRef.current || !screenTextureRef.current) return;
+      const pmTitleEl = document.getElementById('pm-title');
+      const pmValueEl = document.getElementById('pm-value');
+      const pmUnitEl = document.getElementById('pm-unit');
+      const pmScreenEl = document.getElementById('pm-screen');
+      const pmErrorOverlayEl = document.getElementById('pm-error-overlay');
+      const pmErrorMessageEl = document.getElementById('pm-error-message');
 
-    const value = panelData.Ptot ?? "0";
-    const title = "Total Power";
-    const unit = "kW";
+      if (!pmTitleEl || !firebaseData) return;
 
-    document.getElementById("pm-value").textContent = String(value);
-  }, [panelData]);
+      const currentDisplay = pmDisplayConfig[currentIndex];
+      const value = firebaseData[currentDisplay.key] ?? 0;
+      const isAnomalous = value < currentDisplay.min || value > currentDisplay.max;
+      
+      // Cek anomali secara keseluruhan
+      let overallAnomaly = null;
+      for(const item of pmDisplayConfig) {
+          const val = firebaseData[item.key] ?? 0;
+          if (val < item.min || val > item.max) {
+              overallAnomaly = item;
+              break;
+          }
+      }
 
-  // host container: w-full, height can be controlled by parent. default minHeight
+      pmTitleEl.textContent = currentDisplay.title;
+      pmValueEl.textContent = value.toFixed(currentDisplay.decimals);
+      pmUnitEl.textContent = currentDisplay.unit;
+
+      if (overallAnomaly) {
+          pmScreenEl.style.backgroundColor = 'rgba(255, 82, 82, 0.95)';
+          pmErrorOverlayEl.style.display = 'flex';
+          pmErrorMessageEl.textContent = `ANOMALI: ${overallAnomaly.title}`;
+      } else {
+          pmScreenEl.style.backgroundColor = 'rgba(205, 220, 57, 0.95)';
+          pmErrorOverlayEl.style.display = 'none';
+      }
+
+  }, [firebaseData, currentIndex, pmDisplayConfig]);
+
   return (
     <div
       ref={hostRef}
       style={{
         position: "relative",
         width: "100%",
-        height: "300px",
-        minHeight: "360px",
+        height: "100%",
+        minHeight: "400px",
         overflow: "hidden",
         borderRadius: "12px",
       }}

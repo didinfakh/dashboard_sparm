@@ -33,6 +33,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard2 />} />
         <Route path="/dashboard2" element={<Dashboard1 />} />
+        <Route path="/kwh-forecast" element={<KwhForecastChart />} />
         {/* <Route path="/3d" element={<ElectricalPanel3D />} /> */}
       </Routes>
     </Router>
