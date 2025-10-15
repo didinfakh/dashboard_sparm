@@ -5,6 +5,7 @@ import viteLogo from "/vite.svg";
 import "./App.css";
 import Dashboard1 from "./Dashboard1";
 import Dashboard2 from "./Dashboard2";
+import KwhForecastChart from "./KwhForecastChart";
 // import ElectricalPanel3D from "./components/";
 
 function Home() {
