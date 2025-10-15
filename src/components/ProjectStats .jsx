@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FiArrowUpRight } from "react-icons/fi";
 import { BsCalendarWeek } from "react-icons/bs"; // Ikon kalender
 import { IoChatbubblesOutline } from "react-icons/io5"; // Ikon untuk "On Discuss"
 import { db, db2 } from "../Firebase";
 import { ref, onValue } from "firebase/database";
+import toast, { Toaster } from "react-hot-toast";
 /**
  * Sub-komponen untuk satu kartu statistik.
  * Menerima props untuk menyesuaikan tampilan dan datanya.
@@ -102,7 +103,31 @@ const StatCardLong = ({
  * Komponen utama yang menampilkan semua kartu statistik.
  */
 export const ProjectStats = () => {
+  // const [isWarning, setIsWarning] = useState(false);
+  const toastId = useRef(null);
+  const blinkInterval = useRef(null);
   const [panelData, setPanelData] = useState({});
+  const [isWarning, setIsWarning] = useState(false);
+  const [warningFields, setWarningFields] = useState([]);
+
+  const limits = {
+    Vavg: { min: 11000, max: 22000 },
+    Iavg: { min: 0, max: 10 },
+    Ptot: { min: 0, max: 1000 },
+    Edel: { min: 0, max: Infinity }, // energi terpakai tidak dibatasi
+    V1: { min: 19000, max: 22000 },
+    V2: { min: 19000, max: 22000 },
+    V3: { min: 19000, max: 22000 },
+  };
+
+  // 🏷️ Label human-readable
+  const fieldLabels = {
+    Iavg: "Arus Rata-rata (Iavg)",
+    Ptot: "Daya Total (Ptot)",
+    V1: "Tegangan Phase 1 (V1)",
+    V2: "Tegangan Phase 2 (V2)",
+    V3: "Tegangan Phase 3 (V3)",
+  };
   useEffect(() => {
     console.log("Fetching data from Firebase...");
     const panelRef = ref(db2, "sensor_data");
@@ -113,6 +138,23 @@ export const ProjectStats = () => {
         const data = snapshot.val();
         if (data) {
           setPanelData(data);
+          console.log("Data terbaru diterima:", data);
+          const exceeded = [];
+          for (const key in limits) {
+            const limit = limits[key];
+            const val = data[key];
+            if (val !== undefined && (val < limit.min || val > limit.max)) {
+              exceeded.push(key);
+            }
+          }
+
+          if (exceeded.length > 0) {
+            setIsWarning(true);
+            setWarningFields(exceeded);
+          } else {
+            setIsWarning(false);
+            setWarningFields([]);
+          }
         }
       },
       (error) => {
@@ -122,6 +164,27 @@ export const ProjectStats = () => {
 
     return () => unsubscribe();
   }, []);
+  useEffect(() => {
+    if (isWarning && warningFields.length > 0) {
+      const message = warningFields
+        .map((key) => fieldLabels[key] || key)
+        .join(", ");
+      console.log(` Peringatan: ${message} di luar batas normal`);
+
+      blinkInterval.current = setInterval(() => {
+        toast.error(` ${message} di luar batas normal!`, {
+          duration: 1000,
+          position: "top-center",
+          style: { background: "red", color: "white" },
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (blinkInterval.current) clearInterval(blinkInterval.current);
+    };
+  }, [isWarning, warningFields]);
+
   const statsData = [
     {
       title: "Phase 1",
@@ -188,6 +251,7 @@ export const ProjectStats = () => {
           />
         ))}
       </div>
+      <Toaster />
     </div>
   );
 };

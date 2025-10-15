@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { FiArrowUpRight } from "react-icons/fi";
 import { BsCalendarWeek } from "react-icons/bs"; // Ikon kalender
 import { IoChatbubblesOutline } from "react-icons/io5"; // Ikon untuk "On Discuss"
 import { db, db2 } from "../Firebase";
 import { ref, onValue } from "firebase/database";
+import toast, { Toaster } from "react-hot-toast";
 /**
  * Sub-komponen untuk satu kartu statistik.
  * Menerima props untuk menyesuaikan tampilan dan datanya.
@@ -103,6 +104,25 @@ const StatCardLong = ({
  */
 export const ProjectStats1 = () => {
   const [panelData, setPanelData] = useState({});
+  const [isWarning, setIsWarning] = useState(false);
+  const [warningFields, setWarningFields] = useState([]);
+  const blinkInterval = useRef(null);
+  const limits = {
+    voltage: { min: 190, max: 240 }, // Volt
+    current: { min: 0, max: 10 }, // Ampere
+    power: { min: 0, max: 1000 }, // Watt
+    power_factor: { min: 0.8, max: 1 }, // PF
+    frequency: { min: 49, max: 51 }, // Hz
+    fasa_1: { min: 190, max: 240 }, // Volt
+  };
+  const fieldLabels = {
+    voltage: "Tegangan (Voltage)",
+    current: "Arus (Current)",
+    power: "Daya (Power)",
+    power_factor: "Faktor Daya (Power Factor)",
+    frequency: "Frekuensi",
+    fasa_1: "Tegangan Fasa 1",
+  };
   useEffect(() => {
     console.log("Fetching data from Firebase...");
     const panelRef = ref(db, "panel_1/pa330");
@@ -113,6 +133,34 @@ export const ProjectStats1 = () => {
         if (data) {
           setPanelData(data);
           console.log("Data terbaru:", data);
+          if (data && data.ct_1) {
+            const combined = {
+              ...data.ct_1, // ambil semua dari ct_1
+              fasa_1: data.fasa_1, // ambil fasa 1
+              frequency: data.frekuensi || data.ct_1.frequency, // prioritas frekuensi utama
+            };
+
+            setPanelData(combined);
+            console.log("Data terbaru:", combined);
+
+            // 🔍 Validasi ambang batas
+            const exceeded = [];
+            for (const key in limits) {
+              const val = combined[key];
+              const limit = limits[key];
+              if (val !== undefined && (val < limit.min || val > limit.max)) {
+                exceeded.push(key);
+              }
+            }
+
+            if (exceeded.length > 0) {
+              setIsWarning(true);
+              setWarningFields(exceeded);
+            } else {
+              setIsWarning(false);
+              setWarningFields([]);
+            }
+          }
         }
       },
       (error) => {
@@ -122,6 +170,25 @@ export const ProjectStats1 = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (isWarning && warningFields.length > 0) {
+      const message = warningFields
+        .map((key) => fieldLabels[key] || key)
+        .join(", ");
+
+      blinkInterval.current = setInterval(() => {
+        toast.error(` ${message} di luar batas normal!`, {
+          duration: 1000,
+          position: "top-center",
+          style: { background: "red", color: "white" },
+        });
+      }, 1000);
+    }
+    return () => {
+      if (blinkInterval.current) clearInterval(blinkInterval.current);
+    };
+  }, [isWarning, warningFields]);
   const statsData = [
     {
       title: "Phase 1",
@@ -188,6 +255,7 @@ export const ProjectStats1 = () => {
           />
         ))}
       </div>
+      <Toaster />
     </div>
   );
 };

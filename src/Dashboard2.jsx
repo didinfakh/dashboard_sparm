@@ -108,7 +108,7 @@ const Dashboard2 = () => {
         <main>
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h2 className="text-3xl font-bold text-gray-800">Dashboard 2</h2>
+              <h2 className="text-3xl font-bold text-gray-800">Dashboard 1</h2>
               <p className="text-gray-500">You have 3 appointments today</p>
             </div>
           </div>

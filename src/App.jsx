@@ -31,8 +31,8 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Dashboard1 />} />
-        <Route path="/dashboard2" element={<Dashboard2 />} />
+        <Route path="/" element={<Dashboard2 />} />
+        <Route path="/dashboard2" element={<Dashboard1 />} />
         {/* <Route path="/3d" element={<ElectricalPanel3D />} /> */}
       </Routes>
     </Router>
