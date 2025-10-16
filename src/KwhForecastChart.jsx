@@ -48,7 +48,7 @@ function KwhForecastChart() {
       await loginFirestore();
 
       // --- 1. Mengambil Data Aktual dari 'power_history' (Tidak Berubah) ---
-      const twoMonthsAgo = subMonths(startOfToday(), 2);
+      const twoMonthsAgo = subMonths(startOfToday(), 1);
       const actualDataRef = collection(firestore, "power_history");
       const actualQuery = query(
         actualDataRef,
