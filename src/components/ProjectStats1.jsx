@@ -125,25 +125,25 @@ export const ProjectStats1 = () => {
   };
   useEffect(() => {
     console.log("Fetching data from Firebase...");
-    const panelRef = ref(db, "panel_1/pa330");
-    const unsubscribe = onValue(
+
+    const panelRef = ref(db2, "Panel1");
+    const pzemRef = ref(db2, "pzem");
+
+    const unsubPanel = onValue(
       panelRef,
       (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          setPanelData(data);
-          console.log("Data terbaru:", data);
-          if (data && data.ct_1) {
+        const panelData = snapshot.val();
+        if (panelData) {
+          console.log("Data Panel1:", panelData);
+
+          setPanelData((prev) => {
             const combined = {
-              ...data.ct_1, // ambil semua dari ct_1
-              fasa_1: data.fasa_1, // ambil fasa 1
-              frequency: data.frekuensi || data.ct_1.frequency, // prioritas frekuensi utama
+              ...prev,
+              ...panelData,
+              frequency_panel: panelData.Frequency, // frekuensi khusus untuk Panel1
             };
 
-            setPanelData(combined);
-            console.log("Data terbaru:", combined);
-
-            // 🔍 Validasi ambang batas
+            // Validasi ambang batas
             const exceeded = [];
             for (const key in limits) {
               const val = combined[key];
@@ -160,15 +160,45 @@ export const ProjectStats1 = () => {
               setIsWarning(false);
               setWarningFields([]);
             }
-          }
+
+            console.log("Data gabungan (Panel1):", combined);
+            return combined;
+          });
         }
       },
       (error) => {
-        console.error("Error membaca data:", error);
+        console.error("Error membaca Panel1:", error);
       }
     );
 
-    return () => unsubscribe();
+    const unsubPzem = onValue(
+      pzemRef,
+      (snapshot) => {
+        const pzemData = snapshot.val();
+        if (pzemData) {
+          console.log("Data pzem:", pzemData);
+
+          setPanelData((prev) => {
+            const combined = {
+              ...prev,
+              ...pzemData,
+              frequency_pzem: pzemData.Frekuensi, // frekuensi khusus untuk pzem
+            };
+            console.log("Data gabungan (pzem):", combined);
+            return combined;
+          });
+        }
+      },
+      (error) => {
+        console.error("Error membaca pzem:", error);
+      }
+    );
+
+    // cleanup listener
+    return () => {
+      unsubPanel();
+      unsubPzem();
+    };
   }, []);
 
   useEffect(() => {
@@ -192,7 +222,7 @@ export const ProjectStats1 = () => {
   const statsData = [
     {
       title: "Phase 1",
-      id: "voltage",
+      id: "Voltage_L1_N",
       value: 10,
       satuan: "V",
       description: "Displays voltage of the first phase",
@@ -201,7 +231,7 @@ export const ProjectStats1 = () => {
     },
     {
       title: "Total Power",
-      id: "power",
+      id: "Tegangan",
       satuan: "KW",
       value: 12,
       description: "Displays Total Power",
@@ -210,7 +240,7 @@ export const ProjectStats1 = () => {
     },
     {
       title: "Frekuensi",
-      id: "frequency",
+      id: "frequency_panel",
       satuan: "Hz",
       value: 2,
       description: "Displays voltage of the third phase",
@@ -219,7 +249,7 @@ export const ProjectStats1 = () => {
     },
     {
       title: "Energy Delivered",
-      id: "Edel",
+      id: "Energi",
       satuan: "KWH",
       value: 24,
       description: "Average current across all phases",
@@ -229,31 +259,39 @@ export const ProjectStats1 = () => {
   ];
 
   return (
-    <div className=" font-sans">
-      <div className="grid grid-cols-1 sm:grid-cols-2  gap-6 mb-3">
-        <StatCardLong
-          title="Phase 1"
-          value={`${panelData.fasa_1 ? panelData.fasa_1.toFixed(2) : 0} V`}
-        />
-        <StatCardLong
-          title="Frekuensi"
-          value={`${panelData.frekuensi?.toFixed(1) || 0} Hz`}
-        />
+    <div className=" font-sans ">
+      <div className=" bg-gray-200 rounded-2xl p-6 pt-4">
+        <h1 className="text-2xl font-semibold mb-4">Pzem 004T Monitoring</h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2  lg:grid-cols-4 gap-6 ">
+          {statsData.map((stat, index) => (
+            <StatCard
+              key={index}
+              title={stat.title}
+              id={stat.id}
+              value={stat.value}
+              description={stat.description}
+              icon={stat.icon}
+              variant={stat.variant}
+              panelData={panelData}
+              satuan={stat.satuan}
+            />
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsData.map((stat, index) => (
-          <StatCard
-            key={index}
-            title={stat.title}
-            id={stat.id}
-            value={stat.value}
-            description={stat.description}
-            icon={stat.icon}
-            variant={stat.variant}
-            panelData={panelData.ct_1}
-            satuan={stat.satuan}
+      <div className=" bg-gray-200 rounded-2xl p-6 mt-4 ">
+        <h1 className="text-2xl font-semibold mb-4">Archmeter PA330</h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2    gap-6 mb-3 ">
+          <StatCardLong
+            title="Phase 1"
+            value={`${
+              panelData.Tegangan ? panelData.Tegangan.toFixed(2) : 0
+            } V`}
           />
-        ))}
+          <StatCardLong
+            title="Frekuensi"
+            value={`${panelData.frequency_pzem?.toFixed(1) || 0} Hz`}
+          />
+        </div>
       </div>
       <Toaster />
     </div>
