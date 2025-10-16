@@ -229,31 +229,37 @@ export const ProjectStats1 = () => {
   ];
 
   return (
-    <div className=" font-sans">
-      <div className="grid grid-cols-1 sm:grid-cols-2  gap-6 mb-3">
-        <StatCardLong
-          title="Phase 1"
-          value={`${panelData.fasa_1 ? panelData.fasa_1.toFixed(2) : 0} V`}
-        />
-        <StatCardLong
-          title="Frekuensi"
-          value={`${panelData.frekuensi?.toFixed(1) || 0} Hz`}
-        />
+    <div className=" font-sans ">
+      <div className=" bg-gray-200 rounded-2xl p-6 pt-4">
+        <h1 className="text-2xl font-semibold mb-4">Pzem 004T Monitoring</h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2  lg:grid-cols-4 gap-6 ">
+          {statsData.map((stat, index) => (
+            <StatCard
+              key={index}
+              title={stat.title}
+              id={stat.id}
+              value={stat.value}
+              description={stat.description}
+              icon={stat.icon}
+              variant={stat.variant}
+              panelData={panelData.ct_1}
+              satuan={stat.satuan}
+            />
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsData.map((stat, index) => (
-          <StatCard
-            key={index}
-            title={stat.title}
-            id={stat.id}
-            value={stat.value}
-            description={stat.description}
-            icon={stat.icon}
-            variant={stat.variant}
-            panelData={panelData.ct_1}
-            satuan={stat.satuan}
+      <div className=" bg-gray-200 rounded-2xl p-6 mt-4 ">
+        <h1 className="text-2xl font-semibold mb-4">Archmeter PA330</h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2    gap-6 mb-3 ">
+          <StatCardLong
+            title="Phase 1"
+            value={`${panelData.fasa_1 ? panelData.fasa_1.toFixed(2) : 0} V`}
           />
-        ))}
+          <StatCardLong
+            title="Frekuensi"
+            value={`${panelData.frekuensi?.toFixed(1) || 0} Hz`}
+          />
+        </div>
       </div>
       <Toaster />
     </div>
