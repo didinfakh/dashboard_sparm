@@ -124,16 +124,16 @@ const Dashboard2 = () => {
     return () => unsubscribe();
   }, []);
   return (
-    <div className="bg-gray-100 min-h-screen font-sans">
+    <div className="bg-gray-100 min-h-screen font-sans " >
       <div className="bg-gray-100  shadow-lg p-6">
         {/* Main Content */}
         <main>
-          <div className="flex justify-between items-center mb-6">
+          {/* <div className="flex justify-between items-center mb-6">
             <div>
               <h2 className="text-3xl font-bold text-gray-800">Dashboard 1</h2>
               <p className="text-gray-500">You have 3 appointments today</p>
             </div>
-          </div>
+          </div> */}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 relative flex !max-h-[100px]">
