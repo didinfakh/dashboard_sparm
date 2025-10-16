@@ -83,8 +83,7 @@ const StatCardLong = ({
         <h3 className=" font-semibold">{title}</h3>
         <p className="text-4xl font-bold">{value}</p>
         <p className="text-sm opacity-75 mt-1">
-          Lorem ipsum dolor sit amet consectetur adipisicing elit. Itaque,
-          eaque.
+          {description}
         </p>
       </div>
       <div className="flex flex-col items-end">
@@ -233,10 +232,12 @@ export const ProjectStats = () => {
         <StatCardLong
           title="Average Current"
           value={`${panelData.Iavg ? panelData.Iavg.toFixed(2) : 0} A`}
+          description={"Displays Average Current "}
         />
         <StatCardLong
           title="Energy Delivered"
           value={`${(panelData.Edel / 100).toFixed(1) || 0} Kwh`}
+          description={"Displays Energy Delivered "}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

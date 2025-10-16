@@ -7,8 +7,8 @@ const Dashboard1 = () => {
     <main className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-3xl font-bold text-gray-800">Dashboard 2</h2>
-          <p className="text-gray-500">You have 3 appointments today</p>
+          {/* <h2 className="text-3xl font-bold text-gray-800">Dashboard 2</h2>
+          <p className="text-gray-500">You have 3 appointments today</p> */}
         </div>
       </div>
 
@@ -17,10 +17,10 @@ const Dashboard1 = () => {
           {/* Patient Body Analysis */}
           <div className="md:col-span-2 bg-gray-200 p-4 rounded-2xl">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="font-semibold">Patient Body Analysis</h3>
+              {/* <h3 className="font-semibold">Patient Body Analysis</h3>
               <button className="text-sm text-gray-500 flex items-center gap-2">
                 Real Time
-              </button>
+              </button> */}
             </div>
             <ProjectStats1 />
           </div>

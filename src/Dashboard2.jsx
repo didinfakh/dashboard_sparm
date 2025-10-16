@@ -144,10 +144,10 @@ const Dashboard2 = () => {
               {/* Patient Body Analysis */}
               <div className="md:col-span-2 bg-gray-200 p-4 rounded-2xl">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-semibold">Patient Body Analysis</h3>
-                  <button className="text-sm text-gray-500 flex items-center gap-2">
+                  {/* <h3 className="font-semibold">Patient Body Analysis</h3> */}
+                  {/* <button className="text-sm text-gray-500 flex items-center gap-2">
                     Real Time
-                  </button>
+                  </button> */}
                 </div>
                 <ProjectStats />
               </div>
