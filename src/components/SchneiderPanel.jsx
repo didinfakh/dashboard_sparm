@@ -11,30 +11,6 @@ import { initializeApp, getApps } from "firebase/app";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
-// =====================================================================================
-// !! PENTING SEKALI: PENYEBAB DATA TIDAK MASUK ADA DI SINI !!
-// =====================================================================================
-// Error koneksi atau data kosong hampir 100% disebabkan oleh Firebase Security Rules
-// yang memblokir akses baca (read) secara default.
-//
-// CARA MEMPERBAIKI (WAJIB DILAKUKAN):
-// 1. Buka project Firebase Anda di website Firebase.
-// 2. Pada menu di sebelah kiri, pilih "Build" > "Realtime Database".
-// 3. Klik tab "Rules" (Aturan) di bagian atas.
-// 4. Anda akan melihat kode seperti { "rules": { ".read": "false", ".write": "false" } }.
-// 5. Ganti SELURUH isinya dengan kode di bawah ini, lalu klik "Publish":
-//
-// {
-//   "rules": {
-//     ".read": true,
-//     ".write": true
-//   }
-// }
-//
-// Setelah Anda menekan "Publish", aplikasi akan langsung bisa membaca data.
-// =====================================================================================
-
-
 // Konfigurasi Firebase RTDB Anda
 const firebaseConfigRTDB = {
   apiKey: "AIzaSyCwOjCx_FHmZdlIiW_3rLYx93-rvTFgzC4",
@@ -76,16 +52,12 @@ export default function SchneiderPanel() {
     { key: "V3", title: "Tegangan Fase 3", unit: "V", min: 19000, max: 22000, decimals: 2 },
   ];
 
-  // 1. useEffect untuk mengambil data dari Firebase (METODE PALING ROBUST)
+  // 1. useEffect untuk mengambil data dari Firebase (Tidak ada perubahan)
   useEffect(() => {
     console.log("1. Komponen dimuat, menyiapkan listener autentikasi...");
-    
-    // Listener ini akan bereaksi terhadap status login (termasuk login anonim)
     const authUnsubscribe = onAuthStateChanged(authRTDB, (user) => {
         if (user) {
-            // Jika user berhasil login (termasuk anonim)
             console.log("2. Autentikasi berhasil (User UID:", user.uid, "). Memasang listener data...");
-            
             const sensorRef = ref(dbRTDB, "sensor_data");
             const dataUnsubscribe = onValue(sensorRef, 
                 (snapshot) => {
@@ -107,15 +79,11 @@ export default function SchneiderPanel() {
                     setIsLoading(false);
                 }
             );
-            
-            // Simpan fungsi unsubscribe untuk data listener
             return () => {
                 console.log("Melepaskan listener data.");
                 dataUnsubscribe();
             };
-
         } else {
-            // Jika tidak ada user, coba login anonim
             console.log("2. Belum ada user, mencoba login anonim...");
             signInAnonymously(authRTDB).catch((err) => {
                 console.error("❌ GAGAL: Login anonim error:", err);
@@ -124,20 +92,20 @@ export default function SchneiderPanel() {
             });
         }
     });
-
-    // Fungsi cleanup: akan dipanggil saat komponen di-unmount
     return () => {
       console.log("Melepaskan listener autentikasi.");
       authUnsubscribe();
     };
-  }, []); // Array dependensi kosong, hanya dijalankan sekali
-
+  }, []);
 
   // 2. useEffect untuk setup scene Three.js dan UI
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
     
+    // <-- [MODIFIKASI] Menambahkan Clock untuk animasi berbasis waktu
+    const clock = new THREE.Clock(); 
+
     let width = host.clientWidth;
     let height = host.clientHeight || 400;
 
@@ -167,7 +135,7 @@ export default function SchneiderPanel() {
     controls.minDistance = 10;
     controls.maxDistance = 50;
     controls.target.set(0, 4, 0);
-    controls.enableZoom = false;
+    // controls.enableZoom = false; // Kita nonaktifkan zoom di OrbitControls dan handle manual
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -175,6 +143,8 @@ export default function SchneiderPanel() {
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 1024;
     dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.bias = -0.001;
+    scene.add(dirLight);
     scene.add(dirLight);
     scene.add(new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5));
 
@@ -183,7 +153,7 @@ export default function SchneiderPanel() {
       new THREE.ShadowMaterial({ opacity: 0.3 })
     );
     floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -3.0;
+    floor.position.y = -6.5;
     floor.receiveShadow = true;
     scene.add(floor);
 
@@ -197,7 +167,9 @@ export default function SchneiderPanel() {
 
     const panelGroup = new THREE.Group();
     scene.add(panelGroup);
-    panelGroup.position.y = 1.5;
+    
+    // <-- [MODIFIKASI 1] Posisi panel dibuat lebih rendah
+    panelGroup.position.y = -2;
 
     function createBox(width, height, depth, material, position) {
         const geometry = new THREE.BoxGeometry(width, height, depth);
@@ -243,6 +215,7 @@ export default function SchneiderPanel() {
     const greenLabelBotRight = createBox(3, 0.2, 0.1, mat.schneiderGreen, { x: 5.5, y: 1.2, z: panelDepth / 2 + 0.1 });
     panelGroup.add(greenLabelTop, greenLabelBotLeft, greenLabelBotRight);
 
+    // ... (HTML untuk pmEl tidak ada perubahan)
     const pmEl = document.createElement("div");
     pmEl.style.width = "280px";
     pmEl.style.pointerEvents = "auto";
@@ -282,29 +255,35 @@ export default function SchneiderPanel() {
     pmPrevBtn.addEventListener('click', prevHandler);
     pmNextBtn.addEventListener('click', nextHandler);
     
-    let targetDistance = camera.position.distanceTo(controls.target);
+    // <-- [MODIFIKASI 2 & 3] Logika interaksi dan animasi dirombak total
     let isUserInteracting = false;
     let needsReset = false;
     let interactionTimeout;
+    
+    // <-- Variabel baru untuk animasi ayunan (swing)
+    const swingAngle = THREE.MathUtils.degToRad(30); // Sudut ayunan 30 derajat
+    const swingSpeed = 0.5; // Kecepatan ayunan
+    let swingStartTime = 0; // Waktu mulai untuk reset ayunan
 
-    const onWheel = (event) => {
-        isUserInteracting = true;
-        clearTimeout(interactionTimeout);
-        interactionTimeout = setTimeout(() => { isUserInteracting = false; needsReset = true; }, 3000);
-        const zoomAmount = event.deltaY * 0.005;
-        targetDistance = THREE.MathUtils.clamp(targetDistance + zoomAmount * targetDistance, controls.minDistance, controls.maxDistance);
+    // Fungsi untuk memulai timer reset
+    const startResetTimer = () => {
+      clearTimeout(interactionTimeout);
+      interactionTimeout = setTimeout(() => {
+        isUserInteracting = false;
+        needsReset = true;
+      }, 3000); // Tunggu 3 detik setelah interaksi terakhir
     };
-    host.addEventListener('wheel', onWheel, { passive: false });
-
+    
+    // Event listener untuk interaksi
     const onInteractionStart = () => {
-        isUserInteracting = true;
-        needsReset = false;
-        clearTimeout(interactionTimeout);
+      isUserInteracting = true;
+      needsReset = false;
+      clearTimeout(interactionTimeout);
     };
     const onInteractionEnd = () => {
-        clearTimeout(interactionTimeout);
-        interactionTimeout = setTimeout(() => { isUserInteracting = false; needsReset = true; }, 3000);
+      startResetTimer();
     };
+
     controls.addEventListener('start', onInteractionStart);
     controls.addEventListener('end', onInteractionEnd);
 
@@ -320,19 +299,28 @@ export default function SchneiderPanel() {
 
     function animate() {
       rafRef.current = requestAnimationFrame(animate);
-      const currentDistance = camera.position.distanceTo(controls.target);
-      const smoothedDistance = THREE.MathUtils.lerp(currentDistance, targetDistance, 0.08);
-      const direction = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
-      camera.position.copy(controls.target).addScaledVector(direction, smoothedDistance);
-      
-      if (needsReset) {
+      const elapsedTime = clock.getElapsedTime(); // Waktu dari clock
+
+      // Jika pengguna berinteraksi, jangan lakukan animasi otomatis
+      if (isUserInteracting) {
+        // Tidak melakukan apa-apa, biarkan kontrol pengguna
+      } 
+      // Jika butuh reset, kembalikan panel ke posisi depan
+      else if (needsReset) {
+          // Lakukan interpolasi (gerakan halus) untuk kembali ke rotasi 0
           panelGroup.rotation.y = THREE.MathUtils.lerp(panelGroup.rotation.y, 0, 0.05);
+
+          // Jika sudah sangat dekat dengan 0, anggap selesai
           if (Math.abs(panelGroup.rotation.y) < 0.01) {
               panelGroup.rotation.y = 0;
-              needsReset = false;
+              needsReset = false; // Selesai reset
+              swingStartTime = elapsedTime; // Catat waktu untuk memulai ayunan baru dari 0
           }
-      } else if (!isUserInteracting) {
-          panelGroup.rotation.y += 0.0015;
+      } 
+      // Jika tidak ada interaksi dan tidak butuh reset, lakukan animasi ayunan
+      else {
+          const swingTime = elapsedTime - swingStartTime;
+          panelGroup.rotation.y = Math.sin(swingTime * swingSpeed) * swingAngle;
       }
 
       const panelDirection = new THREE.Vector3(0, 0, 1).applyQuaternion(panelGroup.quaternion);
@@ -351,7 +339,6 @@ export default function SchneiderPanel() {
     return () => {
         cancelAnimationFrame(rafRef.current);
         ro.disconnect();
-        host.removeEventListener('wheel', onWheel);
         controls.removeEventListener('start', onInteractionStart);
         controls.removeEventListener('end', onInteractionEnd);
         pmPrevBtn.removeEventListener('click', prevHandler);
@@ -369,9 +356,9 @@ export default function SchneiderPanel() {
             }
         });
     };
-  }, []);
+  }, []); // Dependensi kosong, hanya dijalankan sekali
 
-  // 3. useEffect untuk update UI display berdasarkan data Firebase
+  // 3. useEffect untuk update UI display (Tidak ada perubahan)
   useEffect(() => {
       const pmTitleEl = document.getElementById('pm-title');
       const pmValueEl = document.getElementById('pm-value');
@@ -471,4 +458,3 @@ export default function SchneiderPanel() {
     />
   );
 }
-
