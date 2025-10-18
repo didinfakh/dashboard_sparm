@@ -1,4 +1,4 @@
-// components/ProjectStats.jsx (ATAU NAMA FILE ASLI ANDA)
+// components/ProjectStats.jsx
 
 import React, { useEffect, useState } from "react";
 import { BsCalendarWeek } from "react-icons/bs";
@@ -6,7 +6,20 @@ import { IoChatbubblesOutline } from "react-icons/io5";
 import { db2 } from "../Firebase";
 import { ref, onValue } from "firebase/database";
 
-// Komponen StatCard (tidak ada perubahan)
+// ✅ 1. FUNGSI BARU UNTUK FORMAT ANGKA
+// Fungsi ini akan mengubah angka menjadi format Indonesia (1.234,56)
+const formatNumberIndonesian = (num) => {
+  // Jika input bukan angka, kembalikan '0'
+  if (typeof num !== 'number' || isNaN(num)) {
+    return '0';
+  }
+  // Gunakan toLocaleString dengan locale 'id-ID'
+  return num.toLocaleString('id-ID', {
+    maximumFractionDigits: 2, // Maksimal 2 angka di belakang koma
+  });
+};
+
+// Komponen StatCard (Telah dimodifikasi)
 const StatCard = ({ title, id, panelData, satuan, progress = 0, variant = "default", isWarning = false }) => {
   const isPrimary = variant === "primary";
   const cardClasses = `p-5 rounded-2xl shadow-sm flex flex-col justify-between transition-colors duration-500 ease-in-out ${isWarning ? "bg-gradient-to-br from-red-500 to-rose-600 text-white" : isPrimary ? "bg-gradient-to-br from-indigo-500 to-blue-600 text-white" : "bg-white text-gray-800"}`;
@@ -17,8 +30,8 @@ const StatCard = ({ title, id, panelData, satuan, progress = 0, variant = "defau
       <div>
         <h3 className="font-semibold mb-4">{title}</h3>
         <p className="text-3xl font-bold mb-3">
-          {/* ✅ Logika pembagian desimal Edel dihapus dari sini */}
-          {["V1", "V2", "V3", "Vavg"].includes(id) ? (panelData[id] / 100).toFixed(1) : panelData[id] || 0}{" "}
+          {/* ✅ 2. Terapkan fungsi format di sini */}
+          {formatNumberIndonesian(panelData[id])}{" "}
           {satuan}
         </p>
         <div className={`w-full rounded-full h-2.5 ${isWarning ? 'bg-white/30' : 'bg-gray-200/80'}`}>
@@ -29,7 +42,7 @@ const StatCard = ({ title, id, panelData, satuan, progress = 0, variant = "defau
   );
 };
 
-// Komponen StatCardLong (tidak ada perubahan)
+// Komponen StatCardLong (tidak ada perubahan di sini)
 const StatCardLong = ({ title, value, progress, isWarning = false }) => {
   const cardClasses = `p-5 rounded-2xl shadow-md flex flex-col justify-between transition-colors duration-500 ease-in-out ${isWarning ? "bg-gradient-to-br from-red-500 to-rose-600 text-white" : "bg-gradient-to-br from-indigo-500 to-blue-600 text-white"}`;
   const progressBarBgClass = isWarning ? "bg-white/60" : "bg-green-300";
@@ -54,11 +67,10 @@ export const ProjectStats = () => {
   const [panelData, setPanelData] = useState({});
   const [warningFields, setWarningFields] = useState([]);
 
-  // ✅ Batas Edel diubah ke Infinity agar tidak memicu warning
   const limits = {
     Iavg: { min: 0, max: 10 },
     Ptot: { min: 0, max: 1000 },
-    Edel: { min: -Infinity, max: Infinity }, // Tidak lagi memiliki batas
+    Edel: { min: -Infinity, max: Infinity }, 
     V1: { min: 19000, max: 22000 },
     V2: { min: 19000, max: 22000 },
     V3: { min: 19000, max: 22000 },
@@ -104,15 +116,15 @@ export const ProjectStats = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-3">
         <StatCardLong
           title="Average Current"
-          value={`${panelData.Iavg ? panelData.Iavg.toFixed(2) : 0} A`}
+          // ✅ 3. Terapkan fungsi format di sini
+          value={`${formatNumberIndonesian(panelData.Iavg)} A`}
           progress={calculateProgress(panelData.Iavg, limits.Iavg?.min, limits.Iavg?.max)}
           isWarning={warningFields.includes('Iavg')}
         />
-
-        {/* ✅ PERUBAHAN DI SINI: Kartu Edel diganti Ptot */}
         <StatCardLong
           title="Total Power"
-          value={`${panelData.Ptot ? panelData.Ptot.toFixed(1) : 0} kW`}
+          // ✅ 3. Terapkan fungsi format di sini
+          value={`${formatNumberIndonesian(panelData.Ptot)} kW`}
           progress={calculateProgress(panelData.Ptot, limits.Ptot?.min, limits.Ptot?.max)}
           isWarning={warningFields.includes('Ptot')}
         />

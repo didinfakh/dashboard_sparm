@@ -27,16 +27,17 @@ ChartJS.register( ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarEl
 // === SUB-KOMPONEN KARTU STATISTIK ================================================
 // =================================================================================
 
-// ✅ PERUBAHAN DI SINI: PowerCard diubah menjadi EnergyCard (menampilkan Edel)
 const EnergyCard = ({ edel }) => {
   return (
-    <div className="py-5 px-4 rounded-xl shadow-md h-30 flex flex-col justify-center bg-white text-gray-800"> {/* ✅ Tinggi & padding disesuaikan, warna latar belakang */}
-      <div className="flex items-center gap-4"> {/* ✅ gap ditingkatkan */}
-        <BsLightningChargeFill size={28} className="text-blue-600 opacity-80" /> {/* ✅ Ukuran ikon disesuaikan */}
+    <div className="py-5 px-4 rounded-xl shadow-md h-30 flex flex-col justify-center bg-white text-gray-800">
+      <div className="flex items-center gap-4">
+        <BsLightningChargeFill size={28} className="text-blue-600 opacity-80" />
         <div>
-          <div className="text-base font-semibold text-gray-600 mb-1">Energy Delivered</div> {/* ✅ Ukuran & font-weight teks judul */}
-          <div className="font-bold text-xl"> {/* ✅ Ukuran font nilai edel */}
-            {`${edel || 0} kWh`}
+          <div className="text-base font-semibold text-gray-600 mb-1">Energy Delivered</div>
+          <div className="font-bold text-xl">
+            {/* ✅ PERUBAHAN DI SINI: Format angka di dalam komponen ini */}
+            {/* Math.round() untuk menghilangkan desimal, toLocaleString() untuk pemisah ribuan */}
+            {`${Math.round(edel || 0).toLocaleString("id-ID")} kWh`}
           </div>
         </div>
       </div>
@@ -56,7 +57,6 @@ const PredictionCard = ({ summary }) => {
         <div>
           <div className="text-sm font-medium text-gray-800 opacity-90">Prediction per Month</div>
           <div className="font-bold text-lg">
-            {/* ✅ Dibulatkan menjadi 1 angka di belakang koma */}
             {`${predictedKwh.toFixed(1)} kWh`}
           </div>
         </div>
@@ -66,16 +66,10 @@ const PredictionCard = ({ summary }) => {
       <hr className="border-t border-gray-900/20 my-1" />
 
       {/* Bagian Prediksi Biaya */}
-      <div className="flex items-center gap-2 md:gap-3"> {/* Gap lebih kecil di mobile */}
-  
-        {/* Ukuran ikon responsif: 20px di mobile, 24px di desktop */}
+      <div className="flex items-center gap-2 md:gap-3">
         <FaMoneyBillWave size={20} md:size={24} className="text-yellow-900 opacity-70" />
-        
         <div>
-          {/* Ukuran font responsif */}
           <div className="text-xs md:text-sm font-medium text-gray-800 opacity-90">Estimated Cost</div>
-          
-          {/* Ukuran font responsif */}
           <div className="font-bold text-base md:text-lg">
             {`Rp. ${Math.round(predictedCost).toLocaleString("id-ID")}`}
           </div>
@@ -92,7 +86,6 @@ const PredictionCard = ({ summary }) => {
 
 const Dashboard2 = () => {
   const [monthSummary, setMonthSummary] = useState(null);
-  // ✅ PERUBAHAN DI SINI: State diubah dari ptot ke edel
   const [edel, setEdel] = useState(0);
 
   // useEffect untuk Firestore (tidak ada perubahan)
@@ -116,16 +109,15 @@ const Dashboard2 = () => {
     getFirestoreData();
   }, []);
 
-  // ✅ PERUBAHAN DI SINI: Mengambil data 'Edel' bukan 'Ptot'
   useEffect(() => {
     const panelRef = ref(db2, "sensor_data");
     const unsubscribe = onValue(
       panelRef,
       (snapshot) => {
         const data = snapshot.val();
-        if (data?.Edel) {
-          // ✅ Format data Edel di sini (dibagi 100, 1 desimal)
-          setEdel((data.Edel / 100).toFixed(1));
+        // ✅ PERUBAHAN DI SINI: Mengambil nilai 'Edel' asli tanpa format
+        if (data && typeof data.Edel !== 'undefined') {
+          setEdel(data.Edel);
         }
       },
       (error) => {
@@ -149,7 +141,6 @@ const Dashboard2 = () => {
           <div className="lg:col-span-3 flex flex-col gap-6">
             
             <div className="bg-gray-200 p-4 rounded-2xl">
-              {/* ProjectStats sekarang menampilkan Ptot, bukan Edel */}
               <ProjectStats /> 
             </div>
 
@@ -161,7 +152,6 @@ const Dashboard2 = () => {
               </div>
 
               <div className="col-span-1 flex flex-col gap-6 ">
-                {/* ✅ PERUBAHAN DI SINI: Merender EnergyCard dengan data edel */}
                 <EnergyCard edel={edel} /> 
                 <PredictionCard summary={monthSummary} />
               </div>
