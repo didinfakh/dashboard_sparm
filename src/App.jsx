@@ -1,5 +1,8 @@
+// src/App.jsx
+
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import { useState } from "react";
+// ✅ 1. Import 'useEffect'
+import { useState, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
 import "./App.css";
@@ -28,6 +31,37 @@ function About() {
 
 function App() {
   const [count, setCount] = useState(0);
+
+  // ✅ 2. Tambahkan kode listener 'useEffect' di sini
+  useEffect(() => {
+    // Fungsi yang akan dieksekusi saat menerima pesan
+    const handleMessage = (event) => {
+      
+      // ⚠️ PENTING: Ganti URL ini dengan URL dashboard WISE
+      // tempat Anda menanamkan iframe ini.
+      if (event.origin !== "https://URL-DASHBOARD-INDUK-ANDA.com") {
+        console.warn("Pesan diterima dari origin yang tidak dikenal:", event.origin);
+        return;
+      }
+
+      const data = event.data;
+      
+      // Periksa apakah perintahnya benar
+      if (data && data.command === 'set-zoom') {
+        // Terapkan zoom ke seluruh halaman
+        document.body.style.zoom = data.level;
+      }
+    };
+
+    // Mulai mendengarkan pesan
+    window.addEventListener('message', handleMessage);
+
+    // Bersihkan listener saat komponen dilepas
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []); // Array dependensi kosong berarti ini hanya berjalan sekali saat App dimuat
+
 
   return (
     <Router>
