@@ -66,12 +66,17 @@ const PredictionCard = ({ summary }) => {
       <hr className="border-t border-gray-900/20 my-1" />
 
       {/* Bagian Prediksi Biaya */}
-      <div className="flex items-center gap-3">
-        <FaMoneyBillWave size={24} className="text-yellow-900 opacity-70" />
+      <div className="flex items-center gap-2 md:gap-3"> {/* Gap lebih kecil di mobile */}
+  
+        {/* Ukuran ikon responsif: 20px di mobile, 24px di desktop */}
+        <FaMoneyBillWave size={20} md:size={24} className="text-yellow-900 opacity-70" />
+        
         <div>
-          <div className="text-sm font-medium text-gray-800 opacity-90">Estimated Cost</div>
-          <div className="font-bold text-lg">
-            {/* ✅ PERUBAHAN DI SINI: Nilai dibulatkan tanpa desimal */}
+          {/* Ukuran font responsif */}
+          <div className="text-xs md:text-sm font-medium text-gray-800 opacity-90">Estimated Cost</div>
+          
+          {/* Ukuran font responsif */}
+          <div className="font-bold text-base md:text-lg">
             {`Rp. ${Math.round(predictedCost).toLocaleString("id-ID")}`}
           </div>
         </div>
