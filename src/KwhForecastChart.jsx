@@ -83,7 +83,7 @@ function KwhForecastChart() {
             {
               label: "kWh Aktual",
               data: actualData,
-              borderColor: "#74f078",
+              borderColor: "#9865fa",
               backgroundColor: "#74f078",
               tension: 0.3,
               pointRadius: 1,
@@ -91,7 +91,7 @@ function KwhForecastChart() {
             {
               label: "kWh Prediksi",
               data: predictionData, // Menggunakan data yang sudah diproses
-              borderColor: "#9865fa",
+              borderColor: "#74f078",
               backgroundColor: "#C6A8FF",
               borderDash: [10, 10],
               tension: 0.3,
@@ -147,7 +147,7 @@ function KwhForecastChart() {
   return (
     <div className="page-container">
       {/* ✅ Wrapper diberi tinggi spesifik, misal 500px */}
-      <div className="line-chart-wrapper mx-auto" style={{ height: "250px" }}> 
+      <div className="line-chart-wrapper mx-auto w-[]" style={{ height: "250px" }}> 
         {loading || !chartData ? (
           <p className="loading-text">Memuat data historis & prediksi...</p>
         ) : (

@@ -1,9 +1,11 @@
+// Dashboard2.jsx (ATAU NAMA FILE ASLI ANDA)
+
 import React, { useEffect, useState } from "react";
 
 // Icons
 import { IoChatbubblesOutline } from "react-icons/io5";
-import { BsLightningChargeFill } from "react-icons/bs"; // <-- Ikon baru
-import { FaMoneyBillWave } from "react-icons/fa";       // <-- Ikon baru
+import { BsLightningChargeFill } from "react-icons/bs";
+import { FaMoneyBillWave } from "react-icons/fa";
 
 // Firebase
 import { db2, dbDatabase } from "./Firebase";
@@ -22,27 +24,21 @@ import SchneiderPanel from "./components/SchneiderPanel";
 ChartJS.register( ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title );
 
 // =================================================================================
-// === SUB-KOMPONEN KARTU STATISTIK (TELAH DIDISAIN ULANG) ==========================
+// === SUB-KOMPONEN KARTU STATISTIK ================================================
 // =================================================================================
 
-const PowerCard = ({ ptot, maxPower = 500 }) => { // Tambahkan prop maxPower
-  // Menghitung persentase untuk progress bar, pastikan tidak lebih dari 100%
-  const percentage = Math.min((ptot / maxPower) * 100, 100);
-
+// ✅ PERUBAHAN DI SINI: PowerCard diubah menjadi EnergyCard (menampilkan Edel)
+const EnergyCard = ({ edel }) => {
   return (
-    <div className="p-4 rounded-xl shadow-md h-40 flex flex-col justify-between text-black bg-white">
-      <div>
-        <div className="text-sm font-medium text-gray-500">Power Total</div>
-        <div className="text-3xl font-bold mt-1">{`${ptot || 0} Kw`}</div>
-      </div>
-      <div className="w-full">
-        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-1">
-          <div 
-            className="bg-blue-600 h-2.5 rounded-full" 
-            style={{ width: `${percentage}%`, transition: 'width 0.5s ease-in-out' }}
-          ></div>
+    <div className="py-5 px-4 rounded-xl shadow-md h-30 flex flex-col justify-center bg-white text-gray-800"> {/* ✅ Tinggi & padding disesuaikan, warna latar belakang */}
+      <div className="flex items-center gap-4"> {/* ✅ gap ditingkatkan */}
+        <BsLightningChargeFill size={28} className="text-blue-600 opacity-80" /> {/* ✅ Ukuran ikon disesuaikan */}
+        <div>
+          <div className="text-base font-semibold text-gray-600 mb-1">Energy Delivered</div> {/* ✅ Ukuran & font-weight teks judul */}
+          <div className="font-bold text-xl"> {/* ✅ Ukuran font nilai edel */}
+            {`${edel || 0} kWh`}
+          </div>
         </div>
-        <div className="text-xs text-right text-gray-400">{`Capacity: ${maxPower} Kw`}</div>
       </div>
     </div>
   );
@@ -53,14 +49,15 @@ const PredictionCard = ({ summary }) => {
   const predictedCost = summary?.predicted_total_cost || 0;
 
   return (
-    <div className="p-4 rounded-xl shadow-md h-40 flex flex-col justify-around bg-[#ffd53f] text-black">
+    <div className="p-4 rounded-xl shadow-md h-50 flex flex-col justify-around bg-[#ffd53f] text-black">
       {/* Bagian Prediksi Kwh */}
       <div className="flex items-center gap-3">
         <BsLightningChargeFill size={24} className="text-yellow-900 opacity-70" />
         <div>
-          <div className="text-xs font-medium text-gray-800 opacity-90">Prediction per Month</div>
+          <div className="text-sm font-medium text-gray-800 opacity-90">Prediction per Month</div>
           <div className="font-bold text-lg">
-            {`${Math.round(predictedKwh * 100) / 100} Kwh`}
+            {/* ✅ Dibulatkan menjadi 1 angka di belakang koma */}
+            {`${predictedKwh.toFixed(1)} Kwh`}
           </div>
         </div>
       </div>
@@ -72,9 +69,10 @@ const PredictionCard = ({ summary }) => {
       <div className="flex items-center gap-3">
         <FaMoneyBillWave size={24} className="text-yellow-900 opacity-70" />
         <div>
-          <div className="text-xs font-medium text-gray-800 opacity-90">Estimated Cost</div>
+          <div className="text-sm font-medium text-gray-800 opacity-90">Estimated Cost</div>
           <div className="font-bold text-lg">
-            {`Rp. ${predictedCost.toLocaleString("id-ID")}`}
+            {/* ✅ PERUBAHAN DI SINI: Nilai dibulatkan tanpa desimal */}
+            {`Rp. ${Math.round(predictedCost).toLocaleString("id-ID")}`}
           </div>
         </div>
       </div>
@@ -84,14 +82,15 @@ const PredictionCard = ({ summary }) => {
 
 
 // =================================================================================
-// === KOMPONEN UTAMA DASHBOARD (Struktur Sama) ====================================
+// === KOMPONEN UTAMA DASHBOARD ===================================================
 // =================================================================================
 
 const Dashboard2 = () => {
   const [monthSummary, setMonthSummary] = useState(null);
-  const [ptot, setPtot] = useState(0);
+  // ✅ PERUBAHAN DI SINI: State diubah dari ptot ke edel
+  const [edel, setEdel] = useState(0);
 
-  // ... (useEffect hooks tidak ada perubahan)
+  // useEffect untuk Firestore (tidak ada perubahan)
   useEffect(() => {
     const getFirestoreData = async () => {
       try {
@@ -112,14 +111,16 @@ const Dashboard2 = () => {
     getFirestoreData();
   }, []);
 
+  // ✅ PERUBAHAN DI SINI: Mengambil data 'Edel' bukan 'Ptot'
   useEffect(() => {
     const panelRef = ref(db2, "sensor_data");
     const unsubscribe = onValue(
       panelRef,
       (snapshot) => {
         const data = snapshot.val();
-        if (data?.Ptot) {
-          setPtot(data.Ptot);
+        if (data?.Edel) {
+          // ✅ Format data Edel di sini (dibagi 100, 1 desimal)
+          setEdel((data.Edel / 100).toFixed(1));
         }
       },
       (error) => {
@@ -143,19 +144,20 @@ const Dashboard2 = () => {
           <div className="lg:col-span-3 flex flex-col gap-6">
             
             <div className="bg-gray-200 p-4 rounded-2xl">
-              <ProjectStats />
+              {/* ProjectStats sekarang menampilkan Ptot, bukan Edel */}
+              <ProjectStats /> 
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 w-full">
               
-              <div className="col-span-1 lg:col-span-4 bg-white p-6 rounded-lg shadow-xl">
+              <div className="col-span-1 lg:col-span-4 bg-white p-6 rounded-lg shadow-xl w-[100%]">
                 <h2 className="text-xl font-semibold mb-4 text-black">Record Prediction</h2>
                 <KwhForecastChart />
               </div>
 
-              <div className="col-span-1 flex flex-col gap-6">
-                {/* PENTING: Sesuaikan nilai maxPower di sini */}
-                <PowerCard ptot={ptot} maxPower={500} /> 
+              <div className="col-span-1 flex flex-col gap-6 ">
+                {/* ✅ PERUBAHAN DI SINI: Merender EnergyCard dengan data edel */}
+                <EnergyCard edel={edel} /> 
                 <PredictionCard summary={monthSummary} />
               </div>
 
