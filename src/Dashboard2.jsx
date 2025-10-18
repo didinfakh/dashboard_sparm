@@ -57,7 +57,7 @@ const PredictionCard = ({ summary }) => {
           <div className="text-sm font-medium text-gray-800 opacity-90">Prediction per Month</div>
           <div className="font-bold text-lg">
             {/* ✅ Dibulatkan menjadi 1 angka di belakang koma */}
-            {`${predictedKwh.toFixed(1)} Kwh`}
+            {`${predictedKwh.toFixed(1)} kWh`}
           </div>
         </div>
       </div>
