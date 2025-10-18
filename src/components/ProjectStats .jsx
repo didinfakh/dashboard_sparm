@@ -74,7 +74,7 @@ export const ProjectStats = () => {
     V1: { min: 19000, max: 22000 },
     V2: { min: 19000, max: 22000 },
     V3: { min: 19000, max: 22000 },
-    Vavg: { min: 19000, max: 22000 },
+    Vavg: { min: 11000, max: 22000 },
   };
   
   const calculateProgress = (value, min, max) => {

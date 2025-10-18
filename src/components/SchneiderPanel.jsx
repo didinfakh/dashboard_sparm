@@ -7,7 +7,7 @@ import {
 } from "three/examples/jsm/renderers/CSS3DRenderer.js";
 
 // --- Firebase Integration ---
-import { initializeApp, getApps } from "firebase/app"; 
+import { initializeApp, getApps } from "firebase/app";
 import { getDatabase, ref, onValue } from "firebase/database";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
@@ -39,9 +39,9 @@ export default function SchneiderPanel() {
   const [anomalies, setAnomalies] = useState([]);
   const [anomalyIndex, setAnomalyIndex] = useState(0);
 
-  // ✅ [MODIFIKASI 1] Teks diubah ke Bahasa Inggris
   const pmDisplayConfig = [
-    { key: "Vavg_calc", title: "Average Voltage", unit: "V", min: 11000, max: 22000, decimals: 2 },
+    // ✅ 1. PERUBAHAN DI SINI: Key diubah dari 'Vavg_calc' menjadi 'Vavg'
+    { key: "Vavg", title: "Average Voltage", unit: "V", min: 11000, max: 22000, decimals: 2 },
     { key: "Iavg", title: "Average Current", unit: "A", min: 0, max: 10, decimals: 4 },
     { key: "Ptot", title: "Total Power", unit: "kW", min: 0, max: 1000, decimals: 4 },
     { key: "Edel", title: "Energy Delivered", unit: "kWh", min: -Infinity, max: Infinity, decimals: 2 },
@@ -55,7 +55,7 @@ export default function SchneiderPanel() {
     const authUnsubscribe = onAuthStateChanged(authRTDB, (user) => {
         if (user) {
             const sensorRef = ref(dbRTDB, "sensor_data");
-            const dataUnsubscribe = onValue(sensorRef, 
+            const dataUnsubscribe = onValue(sensorRef,
                 (snapshot) => {
                     const data = snapshot.val();
                     if (data) {
@@ -65,7 +65,7 @@ export default function SchneiderPanel() {
                         setError("Data not found at path 'sensor_data'.");
                     }
                     setIsLoading(false);
-                }, 
+                },
                 (err) => {
                     setError("Access Denied. Check your database security rules.");
                     setIsLoading(false);
@@ -84,11 +84,10 @@ export default function SchneiderPanel() {
 
   // useEffect untuk Three.js (tidak ada perubahan)
   useEffect(() => {
-    // ... (kode three.js Anda yang panjang tetap di sini, tidak perlu diubah)
-        const host = hostRef.current;
+    const host = hostRef.current;
     if (!host) return;
-    
-    const clock = new THREE.Clock(); 
+
+    const clock = new THREE.Clock();
 
     let width = host.clientWidth;
     let height = host.clientHeight || 400;
@@ -115,7 +114,7 @@ export default function SchneiderPanel() {
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.06; 
+    controls.dampingFactor = 0.06;
     controls.minDistance = 10;
     controls.maxDistance = 50;
     controls.target.set(0, 4, 0);
@@ -146,7 +145,7 @@ export default function SchneiderPanel() {
         box.receiveShadow = true;
         return box;
     }
-    
+
     const panelDepth = 4, panelWidth = 7.2, totalTopWidth = panelWidth * 2, leftTopWidth = totalTopWidth / 3 + 2, rightTopWidth = totalTopWidth * 2 / 3 - 2;
     panelGroup.add(createBox(leftTopWidth, 3, panelDepth, mat.panelWhite, { x: (-totalTopWidth / 2) + (leftTopWidth / 2), y: 7.0, z: 0 }), createBox(rightTopWidth, 7, panelDepth, mat.panelWhite, { x: (totalTopWidth / 2) - (rightTopWidth / 2), y: 9.0, z: 0 }));
     panelGroup.add(createBox(panelWidth - 0.2, 4.5, panelDepth - 0.5, mat.panelBlack, { x: -panelWidth / 2, y: 3.25, z: 0.25 }), createBox(panelWidth - 0.2, 4.5, panelDepth - 0.5, mat.panelBlack, { x: panelWidth / 2, y: 3.25, z: 0.25 }));
@@ -176,7 +175,7 @@ export default function SchneiderPanel() {
     const nextHandler = () => setCurrentIndex(prev => (prev + 1) % pmDisplayConfig.length);
     pmPrevBtn.addEventListener('click', prevHandler);
     pmNextBtn.addEventListener('click', nextHandler);
-    
+
     let isUserInteracting = false, needsReset = false, interactionTimeout;
     const swingAngle = THREE.MathUtils.degToRad(30), swingSpeed = 0.5;
     let swingStartTime = 0;
@@ -238,50 +237,42 @@ export default function SchneiderPanel() {
     };
   }, []);
 
-  // ✅ [MODIFIKASI 2] useEffect terpisah untuk MENDETEKSI anomali
+  // useEffect terpisah untuk MENDETEKSI anomali
   useEffect(() => {
     if (!firebaseData) {
       setAnomalies([]);
       return;
     }
-    
-    // Fungsi helper untuk menghitung nilai
+
+    // ✅ 2. PERUBAHAN DI SINI: Logika kalkulasi Vavg dihapus dari 'getValue'
     const getValue = (data, item) => {
-        if (item.key === 'Vavg_calc') {
-            const v1 = data['V1'] ?? 0;
-            const v2 = data['V2'] ?? 0;
-            const v3 = data['V3'] ?? 0;
-            return (v1 + v2 + v3) / 3;
-        }
-        return data[item.key] ?? 0;
+      // Langsung ambil nilai dari data berdasarkan key
+      return data[item.key] ?? 0;
     };
 
-    // Temukan semua anomali dari data terbaru
     const foundAnomalies = pmDisplayConfig.filter(item => {
       const value = getValue(firebaseData, item);
       return value < item.min || value > item.max;
     });
 
-    // Cek apakah daftar anomali benar-benar berubah sebelum update state
-    // Ini mencegah loop render yang tidak perlu
     if (JSON.stringify(foundAnomalies) !== JSON.stringify(anomalies)) {
       setAnomalies(foundAnomalies);
-      setAnomalyIndex(0); // PENTING: Reset siklus ke awal saat daftar anomali berubah
+      setAnomalyIndex(0);
     }
-  }, [firebaseData, pmDisplayConfig, anomalies]); // Dependensi ditambahkan
+  }, [firebaseData, pmDisplayConfig, anomalies]);
 
   // useEffect untuk SIKLUS anomali (tidak berubah)
   useEffect(() => {
     if (anomalies.length > 1) {
       const intervalId = setInterval(() => {
         setAnomalyIndex(prev => (prev + 1) % anomalies.length);
-      }, 2000); // Ganti peringatan setiap 2 detik
+      }, 2000);
 
       return () => clearInterval(intervalId);
     }
   }, [anomalies]);
 
-  // ✅ [MODIFIKASI 3] useEffect terpisah untuk MENAMPILKAN UI
+  // useEffect terpisah untuk MENAMPILKAN UI
   useEffect(() => {
     const pmTitleEl = document.getElementById('pm-title');
     const pmValueEl = document.getElementById('pm-value');
@@ -292,15 +283,13 @@ export default function SchneiderPanel() {
 
     if (!pmTitleEl) return;
 
+    // ✅ 2. PERUBAHAN DI SINI: Logika kalkulasi Vavg dihapus dari 'getValue'
     const getValue = (data, item) => {
-        if (!data || !item) return 0;
-        if (item.key === 'Vavg_calc') {
-            const v1 = data['V1'] ?? 0, v2 = data['V2'] ?? 0, v3 = data['V3'] ?? 0;
-            return (v1 + v2 + v3) / 3;
-        }
-        return data[item.key] ?? 0;
+      if (!data || !item) return 0;
+      // Langsung ambil nilai dari data berdasarkan key
+      return data[item.key] ?? 0;
     };
-    
+
     if (error) {
         pmTitleEl.textContent = "Error";
         pmValueEl.textContent = ":(";
@@ -325,26 +314,26 @@ export default function SchneiderPanel() {
     }
 
     if (anomalies.length > 0) {
-      // Jika ada anomali, tampilkan anomali yang aktif dalam siklus
+      // Tampilkan anomali
       const currentAnomaly = anomalies[anomalyIndex];
       const value = getValue(firebaseData, currentAnomaly);
-      
+
       pmTitleEl.textContent = currentAnomaly.title;
       pmValueEl.textContent = isNaN(value) ? '0.00' : value.toFixed(currentAnomaly.decimals);
       pmUnitEl.textContent = currentAnomaly.unit;
-      
+
       pmScreenEl.style.backgroundColor = 'rgba(255, 82, 82, 0.95)';
       pmErrorOverlayEl.style.display = 'flex';
       pmErrorMessageEl.textContent = `ANOMALY: ${currentAnomaly.title}`;
     } else {
-      // Jika tidak ada anomali, tampilkan data normal
+      // Tampilkan data normal
       const currentDisplay = pmDisplayConfig[currentIndex];
       const value = getValue(firebaseData, currentDisplay);
-      
+
       pmTitleEl.textContent = currentDisplay.title;
       pmValueEl.textContent = isNaN(value) ? '0.00' : value.toFixed(currentDisplay.decimals);
       pmUnitEl.textContent = currentDisplay.unit;
-      
+
       pmScreenEl.style.backgroundColor = 'rgba(205, 220, 57, 0.95)';
       pmErrorOverlayEl.style.display = 'none';
     }

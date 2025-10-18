@@ -23,7 +23,8 @@ import {
   Timestamp,
   orderBy,
 } from "firebase/firestore";
-import { subMonths, startOfToday } from "date-fns";
+// ✅ 1. Import 'subDays' dan 'addDays'
+import { subDays, addDays, startOfToday } from "date-fns"; 
 
 import "./KwhForecastChart.css";
 
@@ -48,13 +49,15 @@ function KwhForecastChart() {
       try {
         setLoading(true);
         await loginFirestore();
+        const today = startOfToday();
 
-        // --- 1. Mengambil Data Aktual dari 'power_history' ---
-        const oneMonthAgo = subMonths(startOfToday(), 1);
+        // --- 1. Mengambil Data Aktual 10 HARI TERAKHIR ---
+        // ✅ 1. Menggunakan 'subDays' untuk mengambil 10 hari
+        const tenDaysAgo = subDays(today, 10);
         const actualDataRef = collection(firestore, "power_history");
         const actualQuery = query(
           actualDataRef,
-          where("timestamp", ">=", Timestamp.fromDate(oneMonthAgo)),
+          where("timestamp", ">=", Timestamp.fromDate(tenDaysAgo)),
           orderBy("timestamp", "asc")
         );
         const actualSnapshot = await getDocs(actualQuery);
@@ -63,12 +66,14 @@ function KwhForecastChart() {
           y: doc.data().energy_per_hour,
         }));
 
-        // --- 2. Mengambil Data Prediksi dari 'monthly_forecast_data' ---
-        const today = startOfToday();
+        // --- 2. Mengambil Data Prediksi untuk 10 HARI KE DEPAN ---
+        // ✅ 2. Menambahkan batas akhir 10 hari dari sekarang
+        const tenDaysFuture = addDays(today, 10);
         const predictionDataRef = collection(firestore, "monthly_forecast_data");
         const predictionQuery = query(
           predictionDataRef,
           where("time", ">=", Timestamp.fromDate(today)),
+          where("time", "<=", Timestamp.fromDate(tenDaysFuture)), // Batasan query baru
           orderBy("time", "asc")
         );
         const predictionSnapshot = await getDocs(predictionQuery);
@@ -84,30 +89,28 @@ function KwhForecastChart() {
               label: "kWh Aktual",
               data: actualData,
               borderColor: "#9865fa",
-              // ✅ 2. Warna background disamakan dengan warna garis (borderColor)
-              backgroundColor: "#9865fa", 
+              backgroundColor: "#9865fa",
               tension: 0.3,
               pointRadius: 1,
-              borderWidth: 1.5, // ✅ 3. Garis dibuat lebih tipis
+              borderWidth: 1.5,
             },
             {
               label: "kWh Prediksi",
               data: predictionData, 
               borderColor: "#74f078",
-              // ✅ 2. Warna background disamakan dengan warna garis (borderColor)
               backgroundColor: "#74f078",
               borderDash: [10, 10],
               tension: 0.3,
               pointRadius: 1,
-              borderWidth: 1.5, // ✅ 3. Garis dibuat lebih tipis
+              borderWidth: 1.5,
             },
           ],
         });
         
-        // --- 4. Menentukan Nilai Max untuk Sumbu Y secara Dinamis ---
+        // --- 4. Menentukan Nilai Max untuk Sumbu Y ---
         const allYValues = [...actualData.map(d => d.y), ...predictionData.map(d => d.y)];
-        const maxYValue = Math.max(...allYValues);
-        const suggestedMax = maxYValue + (maxYValue * 0.1); // Tambah padding 10%
+        const maxYValue = Math.max(...allYValues, 0);
+        const suggestedMax = maxYValue + (maxYValue * 0.1); 
 
         // --- 5. Mengatur Opsi Chart ---
         setChartOptions({
@@ -117,8 +120,12 @@ function KwhForecastChart() {
             x: {
               type: "time",
               time: {
-                unit: "month",
-                tooltipFormat: "dd MMM yyyy HH:mm",
+                // ✅ 3. Mengubah unit menjadi 'day' agar tanggal terlihat jelas
+                unit: "day",
+                tooltipFormat: "dd MMM yyyy",
+                displayFormats: {
+                    day: 'dd MMM' // Format: 18 Okt, 19 Okt, dst.
+                }
               },
               grid: { display: false },
               ticks: { color: "#333" },
@@ -136,9 +143,8 @@ function KwhForecastChart() {
               align: 'end',    
               labels: {
                 color: '#33374d',     
-                // ✅ 1. usePointStyle: false akan membuat legenda berbentuk KOTAK
                 usePointStyle: false, 
-                boxWidth: 12, // Lebar kotak
+                boxWidth: 12,
                 padding: 20,           
                 font: {
                   size: 14,          
@@ -173,3 +179,4 @@ function KwhForecastChart() {
 }
 
 export default KwhForecastChart;
+
