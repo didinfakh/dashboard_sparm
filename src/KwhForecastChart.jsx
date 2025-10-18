@@ -84,18 +84,22 @@ function KwhForecastChart() {
               label: "kWh Aktual",
               data: actualData,
               borderColor: "#9865fa",
-              backgroundColor: "#74f078",
+              // ✅ 2. Warna background disamakan dengan warna garis (borderColor)
+              backgroundColor: "#9865fa", 
               tension: 0.3,
               pointRadius: 1,
+              borderWidth: 1.5, // ✅ 3. Garis dibuat lebih tipis
             },
             {
               label: "kWh Prediksi",
-              data: predictionData, // Menggunakan data yang sudah diproses
+              data: predictionData, 
               borderColor: "#74f078",
-              backgroundColor: "#C6A8FF",
+              // ✅ 2. Warna background disamakan dengan warna garis (borderColor)
+              backgroundColor: "#74f078",
               borderDash: [10, 10],
               tension: 0.3,
               pointRadius: 1,
+              borderWidth: 1.5, // ✅ 3. Garis dibuat lebih tipis
             },
           ],
         });
@@ -120,17 +124,28 @@ function KwhForecastChart() {
               ticks: { color: "#333" },
             },
             y: {
-              beginAtZero: true, // Mulai dari 0 agar lebih intuitif
-              suggestedMax: suggestedMax, // ✅ Batas atas Y Axis dinamis
+              beginAtZero: true, 
+              suggestedMax: suggestedMax, 
               grid: { color: "rgba(0, 0, 0, 0.05)" },
               ticks: { color: "#333" },
             },
           },
           plugins: {
-            legend: { 
-                position: "top", 
-                labels: { color: "#000000" } // ✅ Warna diperbaiki
-            },
+            legend: {
+              position: 'top', 
+              align: 'end',    
+              labels: {
+                color: '#33374d',     
+                // ✅ 1. usePointStyle: false akan membuat legenda berbentuk KOTAK
+                usePointStyle: false, 
+                boxWidth: 12, // Lebar kotak
+                padding: 20,           
+                font: {
+                  size: 14,          
+                  weight: '600',     
+                }
+              }
+            }
           },
         });
 
@@ -146,7 +161,6 @@ function KwhForecastChart() {
 
   return (
     <div className="page-container">
-      {/* ✅ Wrapper diberi tinggi spesifik, misal 500px */}
       <div className="line-chart-wrapper mx-auto w-[]" style={{ height: "250px" }}> 
         {loading || !chartData ? (
           <p className="loading-text">Memuat data historis & prediksi...</p>
